@@ -10,6 +10,7 @@ import { createTheme } from "src/theme";
 import { createEmotionCache } from "src/utils/create-emotion-cache";
 import "simplebar-react/dist/simplebar.min.css";
 import ReduxProvider from "src/redux/provider";
+import { MQTTCenter } from "src/components/mqtt/mqtt-center";
 
 const clientSideEmotionCache = createEmotionCache();
 
@@ -35,6 +36,7 @@ const App = (props) => {
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <ReduxProvider>
+            <MQTTCenter />
             {/* <AuthConsumer>
               {
                 (auth) => auth.isLoading

@@ -1,4 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
-import mainReducer from "src/redux/slice";
+import mqttClientSlice from "./mqtt-client-slice";
 
-export default configureStore({ reducer: { main: mainReducer } });
+const reducer = {
+  MQTTClient: mqttClientSlice,
+};
+
+export default configureStore({
+  reducer,
+});

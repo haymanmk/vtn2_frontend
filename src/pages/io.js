@@ -1,25 +1,131 @@
 import Head from "next/head";
 import { Box, Container, Stack, Typography } from "@mui/material";
-import { SettingsNotifications } from "src/sections/settings/settings-notifications";
-import { SettingsPassword } from "src/sections/settings/settings-password";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
-import { InputStatus } from "src/sections/io/input";
-import { useCallback, useState } from "react";
-import { OutputStatus } from "src/sections/io/output";
+import InputStatus from "src/sections/io/input";
+import { useCallback, useEffect, useState } from "react";
+import OutputStatus from "src/sections/io/output";
+import { useDispatch, useSelector } from "react-redux";
+import { MQTTStoreAction } from "src/redux/mqtt-client-slice";
+import {
+  TOPIC_INPUT_STATUS,
+  TOPIC_INPUT_COMMAND,
+  TOPIC_OUTPUT_STATUS,
+  TOPIC_OUTPUT_COMMAND,
+} from "src/utils/mqtt-topics";
+
+const { subscribeMQTT, unsubscribeMQTT, publishMQTT } = MQTTStoreAction;
+/**
+ * Parent branch
+ * input: manage input states
+ * output: manage output states
+ * operation_mode: tracking current operation mode
+ *
+ * Child branch
+ * status: read status
+ * command: commit actions / control requests
+ */
+const READ_ALL_IO_COMMAND = {
+  [TOPIC_INPUT_COMMAND]: { cmd: "readAll", msg: null },
+  [TOPIC_OUTPUT_COMMAND]: { cmd: "readAll", msg: null },
+};
+
+const useInitMQTT = (mqttState, dispatch) => {
+  useEffect(() => {
+    switch (mqttState) {
+      case "connected":
+        dispatch(subscribeMQTT(TOPIC_INPUT_STATUS));
+        dispatch(subscribeMQTT(TOPIC_OUTPUT_STATUS));
+        dispatch(publishMQTT(READ_ALL_IO_COMMAND));
+        break;
+      case "error":
+        break;
+      default:
+        break;
+    }
+
+    return () => {
+      dispatch(unsubscribeMQTT(TOPIC_INPUT_STATUS));
+      dispatch(unsubscribeMQTT(TOPIC_OUTPUT_STATUS));
+    };
+  }, [mqttState]);
+};
+
+const useIOChanged = (ioStatusChanged, setIOStatus) => {
+  useEffect(() => {
+    if (typeof ioStatusChanged === "undefined") return;
+    const { cmd, msg } = ioStatusChanged;
+    if (typeof cmd === "undefined") return;
+
+    switch (cmd) {
+      case "status":
+        Object.entries(msg).map(([key, value]) => {
+          setIOStatus((prev) => ({
+            ...prev,
+            [key]: value,
+          }));
+        });
+        break;
+      default:
+        break;
+    }
+  }, [ioStatusChanged]);
+};
+
+const useCheckOperationMode = (setBlocking, dispatch) => {
+  useEffect(() => {
+    return () => {
+      dispatch();
+    };
+  }, [setBlocking]);
+};
 
 const Page = () => {
-  const [inputStatus, setInputStatus] = useState({
-    IN01: true,
-    IN02: false,
-    IN03: true,
+  const [inputStatus, setInputStatus] = useState({});
+  const [outputStatus, setOutputStatus] = useState({});
+  // Blocking all the IO control if current operation mode is not allowable.
+  const [blocking, setBlocking] = useState(false);
+
+  const mqttState = useSelector((state) => state.MQTTClient.state);
+  const inputStatusChanged = useSelector((state) => {
+    if (TOPIC_INPUT_STATUS in state.MQTTClient.message)
+      return state.MQTTClient.message[TOPIC_INPUT_STATUS];
   });
-  const handleChange = useCallback(
-    (event, input) => {
-      console.log(event.target.state);
+  const outputStatusChanged = useSelector((state) => {
+    if (TOPIC_OUTPUT_STATUS in state.MQTTClient.message)
+      return state.MQTTClient.message[TOPIC_OUTPUT_STATUS];
+  });
+  const dispatch = useDispatch();
+
+  useInitMQTT(mqttState, dispatch);
+  useIOChanged(inputStatusChanged, setInputStatus);
+  useIOChanged(outputStatusChanged, setOutputStatus);
+
+  const handleInputChange = useCallback(
+    (event) => {
+      const input = event.target.id;
       setInputStatus((prev) => ({ ...prev, [input]: !prev[input] }));
     },
-    [inputStatus]
+    [setInputStatus]
   );
+
+  const handleOutputChange = useCallback(
+    (id, value) => {
+      dispatch(
+        publishMQTT({
+          [TOPIC_OUTPUT_COMMAND]: {
+            cmd: "write",
+            msg: {
+              id,
+              value,
+            },
+          },
+        })
+      );
+      setOutputStatus((prev) => ({ ...prev, [id]: { ...prev[id], value } }));
+    },
+    [setOutputStatus]
+  );
+
   return (
     <>
       <Head>
@@ -35,8 +141,16 @@ const Page = () => {
         <Container maxWidth="lg">
           <Stack spacing={3}>
             <Typography variant="h4">I/O</Typography>
-            <InputStatus inputStatus={inputStatus} onChange={handleChange} />
-            <OutputStatus inputStatus={inputStatus} onChange={handleChange} />
+            <InputStatus
+              inputStatus={inputStatus}
+              onChange={handleInputChange}
+              disabled={blocking}
+            />
+            <OutputStatus
+              outputStatus={outputStatus}
+              onChange={handleOutputChange}
+              disabled={blocking}
+            />
           </Stack>
         </Container>
       </Box>

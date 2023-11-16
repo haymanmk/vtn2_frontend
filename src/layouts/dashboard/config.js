@@ -11,6 +11,7 @@ import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 import { SvgIcon } from "@mui/material";
+import DirectionsRunRoundedIcon from "@mui/icons-material/DirectionsRunRounded";
 
 export const items = [
   {
@@ -19,6 +20,15 @@ export const items = [
     icon: (
       <SvgIcon fontSize="small">
         <PlayCircleFilledTwoToneIcon />
+      </SvgIcon>
+    ),
+  },
+  {
+    title: "Trial Run",
+    path: "/trial-run",
+    icon: (
+      <SvgIcon fontSize="small">
+        <DirectionsRunRoundedIcon />
       </SvgIcon>
     ),
   },
