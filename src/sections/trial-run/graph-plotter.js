@@ -31,6 +31,7 @@ const countAmountLines = (data) => {
       if (arr.length !== 2) {
         console.error(`${errorMsg}: exit 4`);
         amountLines = null;
+        return false;
       }
       amountLines += 1;
       return false;
@@ -46,6 +47,7 @@ export const GraphPlotter = memo((props) => {
   const [_lineOptions, setLineOptions] = useState([]);
   const [selectedLine, setSelectedLine] = useState("all");
   const [selectedData, setSelectedData] = useState([]);
+  const [yLabel, setYLabel] = useState([]);
   const [numLines, setNumLines] = useState(0);
   const boxRef = useRef();
   const amountLines = useRef(0);
@@ -58,13 +60,15 @@ export const GraphPlotter = memo((props) => {
 
     let _options = ["all"];
     if ("y_labels" in options)
-      if (options.y_labels.length)
+      if (options.y_labels.length) {
         _options = [..._options, ...options.y_labels.slice(0, MAX_LINES)];
+        setYLabel(options.y_labels);
+      }
 
     for (let i = _options.length; i < amountLines.current; i++) _options.push(`${i}`);
 
     setLineOptions(_options);
-  }, [data, setLineOptions, setSelectedData, setNumLines]);
+  }, [data, setLineOptions, setSelectedData, setYLabel, setNumLines]);
 
   useEffect(() => {
     if (!boxRef.current) return;
@@ -86,27 +90,18 @@ export const GraphPlotter = memo((props) => {
       if (value === "all") {
         setSelectedData(data);
         setNumLines(amountLines.current);
+        if ("y_labels" in options) setYLabel(options.y_labels);
       } else {
         const index = _lineOptions.findIndex((e) => e === value);
         setSelectedData(data[index - 1]);
         setNumLines(1);
+        if ("y_labels" in options) setYLabel([options.y_labels[index - 1]]);
       }
     },
-    [amountLines, _lineOptions, setSelectedLine, setSelectedData, setNumLines]
+    [amountLines, _lineOptions, setSelectedLine, setSelectedData, setYLabel, setNumLines]
   );
 
   return (
-    // // <Card sx={{ minWidth: minWidth }}>
-    // //   <CardHeader
-    // //     avatar={
-    // //       <Avatar aria-label="plotter">
-    // //         <SsidChartRoundedIcon />
-    // //       </Avatar>
-    // //     }
-    // //     title="Graph Plotter"
-    // //   />
-    // //   <Divider />
-    //   <CardContent>
     <Box sx={{ display: "flex", flexDirection: "column", width: "100%" }}>
       {amountLines.current > 1 && (
         <Box sx={{ marginBottom: "20px" }}>
@@ -146,12 +141,9 @@ export const GraphPlotter = memo((props) => {
           width={width}
           height={height}
           amountLines={numLines}
-          options={options}
+          options={{ ...options, y_labels: yLabel }}
         />
       </Box>
     </Box>
-
-    //   </CardContent>
-    // </Card>
   );
 });

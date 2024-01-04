@@ -43,7 +43,7 @@ export const items = [
   },
   {
     title: "Error Logs",
-    path: "/settings",
+    path: "/error-log",
     icon: (
       <SvgIcon fontSize="small">
         <EventNoteRoundedIcon />

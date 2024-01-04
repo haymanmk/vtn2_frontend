@@ -6,24 +6,31 @@ import {
   TOPIC_CONTROL_ITEM_STATUS,
   TOPIC_LOG_COMMAND,
   TOPIC_LOG_STATUS,
-  TOPIC_OPERATION_MODE_COMMAND,
-  TOPIC_OPERATION_MODE_STATUS,
+  TOPIC_OPERATION_STATE_COMMAND,
+  TOPIC_OPERATION_STATE_STATUS,
   TOPIC_PARAMETER_STATUS,
-  TOPIC_WAVE_DATA,
+  TOPIC_WAVE_STATUS,
   TOPIC_INPUT_STATUS,
   TOPIC_INPUT_COMMAND,
   TOPIC_OUTPUT_STATUS,
   TOPIC_OUTPUT_COMMAND,
+  TOPIC_LAST_WILL,
+  TOPIC_SYSTEM_INFO_COMMAND,
+  TOPIC_SYSTEM_INFO_STATUS,
 } from "src/utils/mqtt-topics";
 
 const DEBUG_MESSAGE = false;
 
 const BUFFER_MAX_SIZE = 1000;
+const LOGS_MAX_LENGTH = 50;
+const LOGS_DAYS = 14;
 const UPDATE_BATCH = 5;
-const HOSTNAME = "172.29.8.47"; // location.hostname;
 const PORT = 9001;
+let hostname = "localhost"; //"172.29.11.49";
 
-let segmentLength = 0;
+let vacuumPressureDataSegmentLength = 0;
+let n2PressureDataSegmentLength = 0;
+let o2ContentDataSegmentLength = 0;
 
 // MQTT settings
 const serviceName = "Frontend-Agent";
@@ -36,12 +43,12 @@ let options = {
   clean: true,
   reconnectPeriod: 1000,
   connectTimeout: 30 * 1000,
-  will: {
-    topic: "lastWill",
-    payload: `${serviceName} service abruptly disconnected.`,
-    qos: 1,
-    retain: false,
-  },
+  // will: {
+  //   topic: "lastWill",
+  //   payload: `${serviceName} service abruptly disconnected.`,
+  //   qos: 1,
+  //   retain: false,
+  // },
 };
 const qos = 1;
 
@@ -56,12 +63,20 @@ const qos = 1;
  * command: commit actions / control requests
  */
 
-const READ_OPERATION_MODE = {
-  [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "read_operation_mode", msg: null },
+const READ_OPERATION_STATE = {
+  [TOPIC_OPERATION_STATE_COMMAND]: { cmd: "read", msg: null },
 };
 
 const READ_LOGS = {
-  [TOPIC_LOG_COMMAND]: { cmd: "readAll", msg: null },
+  [TOPIC_LOG_COMMAND]: {
+    cmd: "read",
+    msg: {
+      from: new Date() - 24 * 60 * 60 * LOGS_DAYS * 1000,
+      until: new Date(),
+      limit: LOGS_MAX_LENGTH,
+      level: "error",
+    },
+  },
 };
 
 const READ_ALL_INPUTS = {
@@ -72,17 +87,23 @@ const READ_ALL_OUTPUTS = {
   [TOPIC_OUTPUT_COMMAND]: { cmd: "readAll", msg: null },
 };
 
+const READ_SYSTEM_INFO = { [TOPIC_SYSTEM_INFO_COMMAND]: { cmd: "readAll", msg: "sys" } };
+
 const {
   publishMQTT,
   subscribeMQTT,
   unsubscribeMQTT,
   updateState,
   updateOperationMode,
+  updateOperationState,
   updateMessage,
   updateVacuumData,
-  updateO2PressureData,
-  updateO2LevelDate,
+  updateN2PressureData,
+  updateO2LevelData,
   updateLog,
+  updateErrorLog,
+  updateSystemInfo,
+  updateCPUTemperature,
   clearBuffer,
   clearAllBuffer,
 } = MQTTStoreAction;
@@ -90,24 +111,42 @@ const {
 const useInitSubscribePublish = (client, dispatch) => {
   useEffect(() => {
     if (client.current) {
-      dispatch(subscribeMQTT(TOPIC_OPERATION_MODE_STATUS));
-      dispatch(subscribeMQTT(TOPIC_WAVE_DATA));
+      dispatch(subscribeMQTT(TOPIC_LAST_WILL));
+      dispatch(subscribeMQTT(TOPIC_OPERATION_STATE_STATUS));
+      dispatch(subscribeMQTT(TOPIC_WAVE_STATUS));
       dispatch(subscribeMQTT(TOPIC_LOG_STATUS));
-      dispatch(publishMQTT(READ_OPERATION_MODE));
+      dispatch(subscribeMQTT(TOPIC_SYSTEM_INFO_STATUS));
+      dispatch(publishMQTT(READ_OPERATION_STATE));
       dispatch(publishMQTT(READ_LOGS));
+      dispatch(publishMQTT(READ_SYSTEM_INFO));
     }
 
     return () => {
-      dispatch(unsubscribeMQTT(TOPIC_OPERATION_MODE_STATUS));
-      dispatch(unsubscribeMQTT(TOPIC_WAVE_DATA));
+      dispatch(unsubscribeMQTT(TOPIC_LAST_WILL));
+      dispatch(unsubscribeMQTT(TOPIC_OPERATION_STATE_STATUS));
+      dispatch(unsubscribeMQTT(TOPIC_WAVE_STATUS));
       dispatch(unsubscribeMQTT(TOPIC_LOG_STATUS));
+      dispatch(unsubscribeMQTT(TOPIC_SYSTEM_INFO_STATUS));
       dispatch(clearAllBuffer());
     };
   }, [client]);
 };
 
-const updateCurrentOperationMode = (msg, dispatch) => {
-  if (msg.cmd === "reply_operation_mode") dispatch(updateOperationMode(msg.msg));
+const updateCurrentOperationState = (message, dispatch) => {
+  try {
+    const { cmd, msg } = JSON.parse(message);
+
+    switch (cmd) {
+      case "read":
+      case "status":
+        const { mode, state, error } = msg;
+        if (mode) dispatch(updateOperationMode(mode));
+        if (state) dispatch(updateOperationState(state));
+        break;
+    }
+  } catch (err) {
+    console.error(err);
+  }
 };
 
 const useProcessTasks = (client, tasks, mqttState, dispatch) => {
@@ -162,10 +201,11 @@ const useProcessTasks = (client, tasks, mqttState, dispatch) => {
  */
 export const MQTTCenter = () => {
   let vacuumData = [];
-  let o2PressureData = [];
-  let o2LevelData = [];
+  let n2PressureData = [];
+  let o2ContentData = [];
   const dispatch = useDispatch();
   let client = useRef(); //MQTT client
+  let webSocketConnectTimeout = useRef();
 
   // lock state to avoid race condition during sub/pub/unsub MQTT topics
 
@@ -175,12 +215,27 @@ export const MQTTCenter = () => {
 
   useEffect(() => {
     if (!client.current) {
+      hostname = window.location.hostname;
       options.clientId = `${serviceName}-${Math.random().toString(16).substring(2, 8)}`;
-      const _url = `ws://${HOSTNAME}:${PORT}`;
+      const _url = `ws://${hostname}:${PORT}`;
+      // watch WebSocket Connection timeout
+      webSocketConnectTimeout.current = setTimeout(() => {
+        const err = `Connect to ${_url} timeout.`;
+        console.error(err);
+        dispatch(
+          updateErrorLog({
+            cmd: "error",
+            msg: { timestamp: new Date().toLocaleString(), message: err },
+          })
+        );
+      }, 100000);
       client.current = mqtt.connect(_url, options);
       dispatch(updateState("connecting"));
     }
-    if (client.current) initEventHandler(client.current);
+    if (client.current) {
+      clearTimeout(webSocketConnectTimeout.current);
+      initEventHandler(client.current);
+    }
 
     return (_) => {
       if (client.current) {
@@ -192,10 +247,10 @@ export const MQTTCenter = () => {
 
       // release memory
       vacuumData = null;
-      o2LevelData = null;
-      o2PressureData = null;
+      n2PressureData = null;
+      o2ContentData = null;
     };
-  }, [client]);
+  }, [client.current]);
 
   useProcessTasks(client, fifoTaskSelector, mqttStateSelector, dispatch);
   useInitSubscribePublish(client, dispatch);
@@ -221,32 +276,108 @@ export const MQTTCenter = () => {
   const messageHandler = (topic, message) => {
     if (DEBUG_MESSAGE) console.log(`MQTT message received from "${topic}": ${message}`);
     handleSpecificTopic(topic, message);
-    dispatch(updateMessage({ [topic]: JSON.parse(message) }));
+    try {
+      dispatch(updateMessage({ [topic]: JSON.parse(message) }));
+    } catch (err) {
+      dispatch(updateMessage({ [topic]: message.toString() }));
+    }
   };
 
   const handleSpecificTopic = (topic, message) => {
-    const { cmd, msg } = JSON.parse(message);
+    let cmd, msg;
+    try {
+      const parsedMsg = JSON.parse(message);
+      if ("cmd" in parsedMsg) cmd = parsedMsg.cmd;
+      if ("msg" in parsedMsg) msg = parsedMsg.msg;
+    } catch (err) {
+      console.warn(`Message cannot be parsed into JSON.`);
+      msg = message.toString();
+    }
     switch (topic) {
-      case TOPIC_OPERATION_MODE_STATUS:
-        updateCurrentOperationMode(message, dispatch);
+      case TOPIC_LAST_WILL:
+        const log = {
+          cmd: "error",
+          msg: { timestamp: new Date().toLocaleString(), message: `Last Will: ${msg}` },
+          open_snackbar: true,
+        };
+        dispatch(updateLog(log));
+        dispatch(updateErrorLog(log));
         break;
-      case TOPIC_WAVE_DATA:
+      case TOPIC_OPERATION_STATE_STATUS:
+        updateCurrentOperationState(message, dispatch);
+        break;
+      case TOPIC_WAVE_STATUS:
+        if (cmd === "clear") clearWaveformData();
+
         if (!msg) return;
-        segmentLength += msg.length;
-        vacuumData = appendData(msg, vacuumData, BUFFER_MAX_SIZE);
-        if (segmentLength >= UPDATE_BATCH) {
-          dispatch(updateVacuumData(vacuumData));
-          segmentLength = 0;
+        if (cmd === "vacuum_pressure") {
+          vacuumPressureDataSegmentLength += msg.length;
+          vacuumData = appendData(msg, vacuumData, BUFFER_MAX_SIZE);
+          if (vacuumPressureDataSegmentLength >= UPDATE_BATCH) {
+            dispatch(updateVacuumData(vacuumData));
+            vacuumPressureDataSegmentLength = 0;
+          }
+        } else if (cmd === "n2_pressure") {
+          n2PressureDataSegmentLength += msg.length;
+          n2PressureData = appendData(msg, n2PressureData, BUFFER_MAX_SIZE);
+          if (n2PressureDataSegmentLength >= UPDATE_BATCH) {
+            dispatch(updateN2PressureData(n2PressureData));
+            n2PressureDataSegmentLength = 0;
+          }
+        } else if (cmd === "o2_content") {
+          o2ContentDataSegmentLength += msg.length;
+          o2ContentData = appendData(msg, o2ContentData, BUFFER_MAX_SIZE);
+          if (o2ContentDataSegmentLength >= UPDATE_BATCH) {
+            dispatch(updateO2LevelData(o2ContentData));
+            o2ContentDataSegmentLength = 0;
+          }
         }
         break;
       case TOPIC_LOG_STATUS:
         if (!msg) return;
-        dispatch(updateLog(msg));
+        try {
+          let payload;
+          if (typeof msg === "object") payload = msg;
+          else payload = JSON.parse(msg);
+          if (cmd !== "read") dispatch(updateLog({ cmd, msg: payload }));
+          if (cmd === "error") dispatch(updateErrorLog({ cmd, msg: payload, open_snackbar: true }));
+          if (cmd === "read") if (payload.length) dispatch(updateErrorLog(payload));
+        } catch (err) {
+          console.error(err);
+        }
+        break;
+      case TOPIC_SYSTEM_INFO_STATUS:
+        if (!msg) return;
+        if (cmd === "readAll") {
+          try {
+            let payload;
+            if (typeof msg === "object") payload = msg;
+            else payload = JSON.parse(msg);
+            dispatch(updateSystemInfo(payload));
+          } catch (err) {
+            console.error(err);
+          }
+        } else if (cmd === "temp") {
+          dispatch(updateCPUTemperature(msg));
+        }
         break;
       default:
         break;
     }
   };
+
+  const clearWaveformData = () => {
+    vacuumData = [];
+    vacuumPressureDataSegmentLength = 0;
+    dispatch(updateVacuumData(vacuumData));
+    n2PressureData = [];
+    n2PressureDataSegmentLength = 0;
+    dispatch(updateN2PressureData(n2PressureData));
+    o2ContentData = [];
+    o2ContentDataSegmentLength = 0;
+    dispatch(updateO2LevelData(o2ContentData));
+  };
+
   return <></>;
 };
 

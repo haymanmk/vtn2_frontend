@@ -1,50 +1,74 @@
-import { Box, Container, Divider, Stack, Step, StepLabel, Stepper } from "@mui/material";
 import Head from "next/head";
-import { useCallback, useState } from "react";
+import { subDays, subHours } from "date-fns";
+import { Box, Container, Unstable_Grid2 as Grid } from "@mui/material";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
-import { StepPage1 } from "src/sections/dashboard/step_page_1";
-import { StepPage2 } from "src/sections/dashboard/step_page_2";
-import { StepPage3 } from "src/sections/dashboard/step_page_3";
+import { OverviewCPUTemperature } from "src/sections/overview/overview-cpu-temperature";
+import { OverviewSystemInfo } from "src/sections/overview/overview-system-info";
+import { OverviewCPUInfo } from "src/sections/overview/overview-cpu-info";
+import { useSelector } from "react-redux";
+import { OverviewSystemDiagnosis } from "src/sections/overview/overview-system-diagonosis";
 
-const steps = ["Enter Production Order", "Enter ESN", "Process Start"];
-const pages = [StepPage1, StepPage2, StepPage3];
-
-const SelectSubPage = (props) => {
-  const SubPage = pages[props.index];
-  if (!SubPage) return <div>Invalid index</div>;
-  return <SubPage {...props} />;
+const now = new Date();
+const mockSystemInfo = {
+  cpu: {
+    manufacturer: "Sony UK",
+    brand: "BCM2711",
+    vendor: "ARM",
+    family: "Cortex-A72",
+  },
+  cpuTemperature: { main: 49.66 },
+  osInfo: {
+    platform: "linux",
+    distro: "Raspbian GNU/Linux",
+    release: "12",
+    codename: "bookworm",
+    kernel: "6.1.0-rpi4-rpi-v8",
+    arch: "arm",
+  },
+  system: {
+    manufacturer: "Raspberry Pi Foundation",
+    model: "Raspberry Pi 4 Model B Rev 1.4",
+    version: "d03114",
+    raspberry: {
+      manufacturer: "Sony UK",
+      processor: "BCM2711",
+      type: "4B",
+      revision: "1.4",
+    },
+  },
 };
 
 const Page = () => {
-  const [activeStep, setActiveStep] = useState(2);
-
-  const handleNext = useCallback(() => {
-    setActiveStep((prev) => prev + 1);
-  }, [activeStep]);
-  const handleBack = useCallback(() => {
-    setActiveStep((prev) => prev - 1);
-  }, [activeStep]);
+  const systemInfoSelector = useSelector((state) => state.MQTTClient.system_info);
+  const cpuTemperatureSelector = useSelector((state) => state.MQTTClient.cpu_temperature);
 
   return (
     <>
       <Head>
-        <title>Dashboard | VTN2</title>
+        <title>Overview | Devias Kit</title>
       </Head>
-      <Box component="main" sx={{ flexGrow: 1, py: 3 }}>
-        <Container maxWidth="lg">
-          <Stack spacing={3} direction="column">
-            <Stepper activeStep={activeStep}>
-              {steps.map((label, index) => {
-                return (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                );
-              })}
-            </Stepper>
-            <Divider />
-            <SelectSubPage index={activeStep} handleNext={handleNext} handleBack={handleBack} />
-          </Stack>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          py: 3,
+        }}
+      >
+        <Container maxWidth="xl">
+          <Grid container spacing={3}>
+            <Grid xs={12} sm={6} lg={4}>
+              <OverviewCPUTemperature value={cpuTemperatureSelector} sx={{ height: 1 }} />
+            </Grid>
+            <Grid xs={12} sm={6} lg={4}>
+              <OverviewCPUInfo value={systemInfoSelector} sx={{ height: 1 }} />
+            </Grid>
+            <Grid xs={12} sm={6} lg={4}>
+              <OverviewSystemInfo value={systemInfoSelector} sx={{ height: 1 }} />
+            </Grid>
+            <Grid xs={36} sm={18} lg={12}>
+              <OverviewSystemDiagnosis sx={{ height: 1 }} />
+            </Grid>
+          </Grid>
         </Container>
       </Box>
     </>

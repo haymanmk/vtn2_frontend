@@ -1,0 +1,21 @@
+[Unit]
+Description=VTN2 Frontend Service
+## make sure we only start the service after network is up
+Wants=network-online.target
+After=network.target
+
+[Service]
+WorkingDirectory=/home/pi/workspace/vtn2_frontend
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=1
+
+# don't use 'nobody' if your script needs to access user files
+# (if User is not set the service will run as root)
+#User=nobody
+
+# Useful during debugging; remove it once the service is working
+##StandardOutput=console
+
+[Install]
+WantedBy=multi-user.target

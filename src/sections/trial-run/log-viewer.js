@@ -1,11 +1,5 @@
 import {
-  Avatar,
   Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Divider,
-  Paper,
   Table,
   TableBody,
   TableCell,
@@ -15,7 +9,6 @@ import {
 } from "@mui/material";
 import { memo, useEffect, useRef, useState } from "react";
 import { info, warning, error } from "src/theme/colors";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 export const LogViewer = memo((props) => {
   const { maxHeight = 350, logs, minWidth = 200 } = props;
@@ -34,23 +27,21 @@ export const LogViewer = memo((props) => {
   }, []);
 
   useEffect(() => {
+    function mouseoverCallback(event) {
+      hoverOnTableRef.current = true;
+    }
+    function mouseleaveCallback(event) {
+      hoverOnTableRef.current = false;
+    }
     if (tableRef.current) {
-      tableRef.current.addEventListener("pointerover", (event) => {
-        hoverOnTableRef.current = true;
-      });
-      tableRef.current.addEventListener("pointerleave", (event) => {
-        hoverOnTableRef.current = false;
-      });
+      tableRef.current.addEventListener("pointerover", mouseoverCallback);
+      tableRef.current.addEventListener("pointerleave", mouseleaveCallback);
     }
 
     return () => {
       if (tableRef.current) {
-        tableRef.current.removeEventListener("pointerover", (event) => {
-          hoverOnTableRef.current = true;
-        });
-        tableRef.current.removeEventListener("pointerleave", (event) => {
-          hoverOnTableRef.current = false;
-        });
+        tableRef.current.removeEventListener("pointerover", mouseoverCallback);
+        tableRef.current.removeEventListener("pointerleave", mouseleaveCallback);
       }
     };
   }, [tableRef.current, hoverOnTableRef.current]);
@@ -64,22 +55,11 @@ export const LogViewer = memo((props) => {
 
       tableRef.current.scrollBy({ top: diff, behavior: "smooth" });
     }
-  }, [latestRowRef.current, hoverOnTableRef.current]);
+  }, [latestRowRef.current, hoverOnTableRef.current, hydrated]);
 
   if (!hydrated) return null;
 
   return (
-    // <Card sx={{ minWidth: minWidth }}>
-    //   <CardHeader
-    //     avatar={
-    //       <Avatar aria-label="log">
-    //         <InfoOutlinedIcon />
-    //       </Avatar>
-    //     }
-    //     title="Logs"
-    //   />
-    //   <Divider />
-    //   <CardContent>
     <Box sx={{ width: "100%", overflow: "hidden" }}>
       <TableContainer sx={{ maxHeight: maxHeight }} ref={tableRef}>
         <Table stickyHeader aria-label="sticky table" size="small">
@@ -93,45 +73,45 @@ export const LogViewer = memo((props) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {logs &&
-              logs.map(({ cmd, msg }, i) => {
-                const { timestamp, message } = msg;
-                let color = "initial";
-                let tag = "INFO";
-                switch (cmd) {
-                  case "info":
-                    color = info.main;
-                    tag = "INFO";
-                    break;
-                  case "warn":
-                    color = warning.main;
-                    tag = "WARN";
-                    break;
-                  case "error":
-                    color = error.main;
-                    tag = "ERROR";
-                    break;
-                }
+            {logs.length
+              ? logs.map(({ cmd, msg }, i) => {
+                  if (!msg) return;
+                  const { timestamp, message } = msg;
+                  let color = "initial";
+                  let tag = "INFO";
+                  switch (cmd) {
+                    case "info":
+                      color = info.main;
+                      tag = "INFO";
+                      break;
+                    case "warn":
+                      color = warning.main;
+                      tag = "WARN";
+                      break;
+                    case "error":
+                      color = error.main;
+                      tag = "ERROR";
+                      break;
+                  }
 
-                return (
-                  <TableRow hover key={timestamp} ref={i === logs.length - 1 ? latestRowRef : null}>
-                    <TableCell align="right" sx={{ paddingY: 0 }}>
-                      {timestamp}
-                    </TableCell>
-                    <TableCell align="left" sx={{ paddingY: 0 }}>
-                      <p style={{ color: color }}>
-                        <b>[{tag}] </b>
-                        <span>{message}</span>
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                  return (
+                    <TableRow hover key={i} ref={i === logs.length - 1 ? latestRowRef : null}>
+                      <TableCell align="right" sx={{ paddingY: 0 }}>
+                        {new Date(timestamp).toLocaleString()}
+                      </TableCell>
+                      <TableCell align="left" sx={{ paddingY: 0 }}>
+                        <p style={{ color: color }}>
+                          <b>[{tag}] </b>
+                          <span>{JSON.stringify(message)}</span>
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              : null}
           </TableBody>
         </Table>
       </TableContainer>
     </Box>
-    //   </CardContent>
-    // </Card>
   );
 });

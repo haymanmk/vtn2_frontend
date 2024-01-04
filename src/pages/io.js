@@ -11,6 +11,10 @@ import {
   TOPIC_INPUT_COMMAND,
   TOPIC_OUTPUT_STATUS,
   TOPIC_OUTPUT_COMMAND,
+  TOPIC_OPERATION_STATE_STATUS,
+  TOPIC_OPERATION_MODE_STATUS,
+  TOPIC_OPERATION_MODE_COMMAND,
+  TOPIC_OPERATION_STATE_COMMAND,
 } from "src/utils/mqtt-topics";
 
 const { subscribeMQTT, unsubscribeMQTT, publishMQTT } = MQTTStoreAction;
@@ -57,6 +61,7 @@ const useIOChanged = (ioStatusChanged, setIOStatus) => {
     if (typeof cmd === "undefined") return;
 
     switch (cmd) {
+      case "readAll":
       case "status":
         Object.entries(msg).map(([key, value]) => {
           setIOStatus((prev) => ({
@@ -71,19 +76,27 @@ const useIOChanged = (ioStatusChanged, setIOStatus) => {
   }, [ioStatusChanged]);
 };
 
-const useCheckOperationMode = (setBlocking, dispatch) => {
+const useOperationModeManager = (setBlocking, state, mode, dispatch) => {
   useEffect(() => {
-    return () => {
-      dispatch();
-    };
-  }, [setBlocking]);
+    if (mode === "manual") {
+      setBlocking(false);
+      return;
+    }
+
+    if (state !== "running") {
+      dispatch(
+        publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "manual" } } })
+      );
+    } else setBlocking(true);
+    return () => {};
+  }, [setBlocking, state, mode]);
 };
 
 const Page = () => {
   const [inputStatus, setInputStatus] = useState({});
   const [outputStatus, setOutputStatus] = useState({});
   // Blocking all the IO control if current operation mode is not allowable.
-  const [blocking, setBlocking] = useState(false);
+  const [blocking, setBlocking] = useState(true);
 
   const mqttState = useSelector((state) => state.MQTTClient.state);
   const inputStatusChanged = useSelector((state) => {
@@ -94,11 +107,20 @@ const Page = () => {
     if (TOPIC_OUTPUT_STATUS in state.MQTTClient.message)
       return state.MQTTClient.message[TOPIC_OUTPUT_STATUS];
   });
+  const operationState = useSelector((state) => state.MQTTClient.operation_state);
+  const operationMode = useSelector((state) => state.MQTTClient.operation_mode);
+
   const dispatch = useDispatch();
 
   useInitMQTT(mqttState, dispatch);
   useIOChanged(inputStatusChanged, setInputStatus);
   useIOChanged(outputStatusChanged, setOutputStatus);
+  useOperationModeManager(setBlocking, operationState, operationMode, dispatch);
+
+  // read current operation status
+  useEffect(() => {
+    dispatch(publishMQTT({ [TOPIC_OPERATION_STATE_COMMAND]: { cmd: "read" } }));
+  }, []);
 
   const handleInputChange = useCallback(
     (event) => {
@@ -135,7 +157,7 @@ const Page = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          py: 8,
+          py: 3,
         }}
       >
         <Container maxWidth="lg">

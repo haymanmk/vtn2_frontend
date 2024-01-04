@@ -20,7 +20,7 @@ export const SideNavItem = (props) => {
 
   return (
     <li>
-      <Tooltip title={props.tooltip}>
+      <Tooltip title={props.tooltip} placement="right">
         <ButtonBase
           sx={{
             alignItems: "center",

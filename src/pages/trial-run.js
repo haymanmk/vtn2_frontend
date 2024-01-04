@@ -1,8 +1,16 @@
-import { Box, Container, Paper, Stack, Tab, Tabs, Typography } from "@mui/material";
-import { flexbox } from "@mui/system";
-import { index } from "d3";
+import {
+  Box,
+  Button,
+  Container,
+  Divider,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  Typography,
+} from "@mui/material";
 import Head from "next/head";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
 import { MQTTStoreAction } from "src/redux/mqtt-client-slice";
@@ -13,44 +21,19 @@ import { Parameters } from "src/sections/trial-run/parameter";
 import {
   TOPIC_CONTROL_ITEM_COMMAND,
   TOPIC_CONTROL_ITEM_STATUS,
+  TOPIC_OPERATION_MODE_COMMAND,
+  TOPIC_OPERATION_STATE_COMMAND,
+  TOPIC_OPERATION_STATE_STATUS,
   TOPIC_PARAMETER_COMMAND,
   TOPIC_PARAMETER_STATUS,
 } from "src/utils/mqtt-topics";
 
 const XS = 3;
-const MIN_HEIGHT = 500;
+const MIN_HEIGHT = 550;
+const DEBUG_MESSAGE = false;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
 
-const mockLines = [
-  [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 3],
-    [4, 3.5],
-  ],
-  [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 4],
-  ],
-  [
-    [2, 3],
-    [3.3, 4.5],
-    [5, 2],
-    [7, 9],
-  ],
-  [
-    [0, 1],
-    [1, 2],
-    [2, 3],
-    [3, 3],
-    [4, 5],
-  ],
-  [[0, 1]],
-];
 const useHookParameterChange = (
   dispatch,
   mqttState,
@@ -140,15 +123,38 @@ const Page = () => {
   const [parameters, setParameters] = useState({});
   const [recipeList, setRecipeList] = useState([]);
   const [selectedProgram, setSelectedProgram] = useState("");
+  const [startAllowed, setStartAllowed] = useState(false); // allow to start trial run mode
   const [controls, setControls] = useState({});
-  // const [lineData, setLineData] = useState(mockLine(10000));
+  const [editing, setEditing] = useState(false);
   const parameterBackup = useRef(); // parameter backup for recovering the edited parameters
 
   const dispatch = useDispatch();
   const mqttState = useSelector((state) => state.MQTTClient.state);
+  const operationMode = useSelector((state) => state.MQTTClient.operation_mode);
+  const operationState = useSelector((state) => state.MQTTClient.operation_state);
   const vacuumLineData = useSelector((state) => state.MQTTClient.vacuum_data);
+  const n2PressureData = useSelector((state) => state.MQTTClient.n2_pressure_data);
+  const o2ContentData = useSelector((state) => state.MQTTClient.o2_level_data);
+  const linesData = useMemo(() => {
+    let arr = [[[0, 0]], [[0, 0]], [[0, 0]]];
+    if (vacuumLineData.length) arr[0] = vacuumLineData;
+    if (n2PressureData.length) arr[1] = n2PressureData;
+    if (o2ContentData.length) arr[2] = o2ContentData;
+    return arr;
+  }, [vacuumLineData, n2PressureData, o2ContentData]);
 
-  // Request parameters from backend service
+  // Read current operation state of backend control center.
+  useEffect(() => {
+    dispatch(publishMQTT({ [TOPIC_OPERATION_STATE_COMMAND]: { cmd: "read" } }));
+  }, []);
+
+  useEffect(() => {
+    if (operationState !== "running") setStartAllowed(true);
+    else {
+      if (DEBUG_MESSAGE) console.log(`Operation State: ${JSON.stringify(msg)}`);
+      setStartAllowed(false);
+    }
+  }, [setStartAllowed, operationState]);
 
   useHookParameterChange(
     dispatch,
@@ -224,6 +230,52 @@ const Page = () => {
     [setControls]
   );
 
+  const onClick_Edit = useCallback(
+    (event) => {
+      if (Object.keys(parameters).length !== 0) setTimeout(() => setEditing(true), 200);
+    },
+    [setEditing, parameters]
+  );
+
+  const onClick_Save = useCallback(
+    (event) => {
+      submitParameterChanges(event);
+      setTimeout(() => setEditing(false), 200);
+    },
+    [submitParameterChanges, setEditing]
+  );
+
+  const onClick_Cancel = useCallback(
+    (event) => {
+      setTimeout(() => {
+        recoverParameters(event);
+        setEditing(false);
+      }, 200);
+    },
+    [setEditing]
+  );
+
+  const startTrialRun = useCallback(
+    (event) => {
+      if (selectedProgram.length)
+        dispatch(
+          publishMQTT({
+            [TOPIC_OPERATION_MODE_COMMAND]: {
+              cmd: "write",
+              msg: { mode: "trial-run", recipe_id: selectedProgram },
+            },
+          })
+        );
+    },
+    [selectedProgram]
+  );
+
+  const stopTrialRun = useCallback((event) => {
+    dispatch(
+      publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "emg-stop" } } })
+    );
+  }, []);
+
   return (
     <>
       <Head>
@@ -265,9 +317,8 @@ const Page = () => {
                     recipeOptions={recipeList}
                     handleRecipeSelect={handleRecipeSelect}
                     onChange={onChangeParameter}
-                    recoverParameters={recoverParameters}
-                    onSubmit={submitParameterChanges}
                     xs={XS}
+                    disabled={editing}
                   />
                 </ContentSelector>
                 <ContentSelector value={selectedTab} index={1}>
@@ -278,14 +329,38 @@ const Page = () => {
                 </ContentSelector>
                 <ContentSelector value={selectedTab} index={3}>
                   <GraphPlotter
-                    data={mockLines}
+                    data={linesData}
                     options={{
                       y_label_pos: "side",
                       x_label: "sec",
-                      y_labels: ["Vacuum(mbar)", "N2(mbar)", "O2(%)", "Dummy"],
+                      y_labels: ["Vacuum(mbar)", "N2(mbar)", "O2(%)"],
                     }}
                   />
                 </ContentSelector>
+              </Box>
+              <Divider />
+              <Box component={"div"} sx={{ display: "flex", justifyContent: "flex-end" }}>
+                {editing && selectedTab === 0 && (
+                  <Button size="small" onClick={onClick_Save}>
+                    SAVE
+                  </Button>
+                )}
+                {editing && selectedTab === 0 && (
+                  <Button size="small" onClick={onClick_Cancel}>
+                    CANCEL
+                  </Button>
+                )}
+                {!editing && selectedTab === 0 && (
+                  <Button size="small" onClick={onClick_Edit}>
+                    EDIT
+                  </Button>
+                )}
+                <Button size="small" disabled={!startAllowed || editing} onClick={startTrialRun}>
+                  Start
+                </Button>
+                <Button size="small" onClick={stopTrialRun} disabled={editing}>
+                  Stop
+                </Button>
               </Box>
             </Paper>
           </Stack>

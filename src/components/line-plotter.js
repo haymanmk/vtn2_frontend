@@ -1,8 +1,8 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, memo } from "react";
 import * as d3 from "d3";
-import { indigo, success, info, warning } from "src/theme/colors";
+import { indigo, neutral, success, warning } from "src/theme/colors";
 
-const colors = [indigo.main, success.main, info.main, warning.main];
+const colors = [indigo.main, neutral[500], warning.main, success.main];
 
 export const LinePlotter = (props) => {
   const {
@@ -34,8 +34,6 @@ export const LinePlotter = (props) => {
   const divRef = useRef();
   const gRef = useRef();
   const xAxis = useRef();
-  const yAxis = useRef();
-  const linePath = useRef();
 
   /**
    * Calculate canvas dimension
@@ -90,7 +88,7 @@ export const LinePlotter = (props) => {
       .attr("text-anchor", "middle")
       .attr("x", PLOT_AREA_WIDTH / 2)
       .attr("y", PLOT_AREA_HEIGHT + OFFSET_X_AXIS_LABLE)
-      .text(options.x_lable);
+      .text(options.x_label);
 
     // append y axis
     $appendYAxes(g, amountLines, PLOT_AREA_HEIGHT);
@@ -103,6 +101,7 @@ export const LinePlotter = (props) => {
   }, [
     gRef,
     amountLines,
+    options,
     PLOT_AREA_WIDTH,
     PLOT_AREA_HEIGHT,
     OFFSET_X_AXIS_LABLE,

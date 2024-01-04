@@ -11,6 +11,7 @@ import { createEmotionCache } from "src/utils/create-emotion-cache";
 import "simplebar-react/dist/simplebar.min.css";
 import ReduxProvider from "src/redux/provider";
 import { MQTTCenter } from "src/components/mqtt/mqtt-center";
+import { AlertSnackbar } from "src/components/alert-snackbar";
 
 const clientSideEmotionCache = createEmotionCache();
 
@@ -28,7 +29,7 @@ const App = (props) => {
   return (
     <CacheProvider value={emotionCache}>
       <Head>
-        <title>Devias Kit</title>
+        <title>VTN2</title>
         <meta name="viewport" content="initial-scale=1, width=device-width" />
       </Head>
       <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -37,6 +38,7 @@ const App = (props) => {
           <CssBaseline />
           <ReduxProvider>
             <MQTTCenter />
+            <AlertSnackbar />
             {/* <AuthConsumer>
               {
                 (auth) => auth.isLoading
