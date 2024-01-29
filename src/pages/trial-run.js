@@ -34,6 +34,8 @@ const DEBUG_MESSAGE = false;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
 
+const READ_PARAMETERS = { [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } };
+
 const useHookParameterChange = (
   dispatch,
   mqttState,
@@ -46,7 +48,7 @@ const useHookParameterChange = (
   useEffect(() => {
     if (mqttState !== "connected") return;
     dispatch(subscribeMQTT(TOPIC_PARAMETER_STATUS));
-    dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } }));
+    dispatch(publishMQTT(READ_PARAMETERS));
 
     return () => {
       dispatch(unsubscribeMQTT(TOPIC_PARAMETER_STATUS));
@@ -143,18 +145,41 @@ const Page = () => {
     return arr;
   }, [vacuumLineData, n2PressureData, o2ContentData]);
 
+  const startTrialRun = useCallback(
+    (event) => {
+      if (selectedProgram.length)
+        dispatch(
+          publishMQTT({
+            [TOPIC_OPERATION_MODE_COMMAND]: {
+              cmd: "write",
+              msg: { mode: "trial-run", recipe_id: selectedProgram },
+            },
+          })
+        );
+    },
+    [selectedProgram]
+  );
+
+  const stopTrialRun = useCallback((event) => {
+    dispatch(
+      publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "emg-stop" } } })
+    );
+  }, []);
+
   // Read current operation state of backend control center.
   useEffect(() => {
     dispatch(publishMQTT({ [TOPIC_OPERATION_STATE_COMMAND]: { cmd: "read" } }));
   }, []);
 
   useEffect(() => {
-    if (operationState !== "running") setStartAllowed(true);
-    else {
+    if (operationState !== "running") {
+      setStartAllowed(true);
+      startTrialRun();
+    } else {
       if (DEBUG_MESSAGE) console.log(`Operation State: ${JSON.stringify(msg)}`);
       setStartAllowed(false);
     }
-  }, [setStartAllowed, operationState]);
+  }, [startTrialRun, setStartAllowed, operationState]);
 
   useHookParameterChange(
     dispatch,
@@ -189,12 +214,7 @@ const Page = () => {
     },
     [setParameters]
   );
-  const recoverParameters = useCallback(
-    (event) => {
-      setParameters((prev) => ({ ...prev, ...parameterBackup.current }));
-    },
-    [parameterBackup, setParameters]
-  );
+
   const submitParameterChanges = useCallback(
     (event) => {
       dispatch(
@@ -247,34 +267,13 @@ const Page = () => {
 
   const onClick_Cancel = useCallback(
     (event) => {
+      dispatch(publishMQTT(READ_PARAMETERS));
       setTimeout(() => {
-        recoverParameters(event);
         setEditing(false);
       }, 200);
     },
     [setEditing]
   );
-
-  const startTrialRun = useCallback(
-    (event) => {
-      if (selectedProgram.length)
-        dispatch(
-          publishMQTT({
-            [TOPIC_OPERATION_MODE_COMMAND]: {
-              cmd: "write",
-              msg: { mode: "trial-run", recipe_id: selectedProgram },
-            },
-          })
-        );
-    },
-    [selectedProgram]
-  );
-
-  const stopTrialRun = useCallback((event) => {
-    dispatch(
-      publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "emg-stop" } } })
-    );
-  }, []);
 
   return (
     <>

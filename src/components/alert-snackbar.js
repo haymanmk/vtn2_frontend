@@ -1,4 +1,4 @@
-import { Box, Divider, Grid, Paper, Snackbar, Stack } from "@mui/material";
+import { Box, Container, Divider, Grid, Paper, Snackbar, Stack } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import CloseIcon from "@mui/icons-material/Close";
@@ -69,9 +69,9 @@ export const AlertSnackbar = (props) => {
             sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
           >
             <ErrorOutlineIcon onClick={onClickHandler} />
-            <Box onClick={onClickHandler} component={"p"} sx={{ m: 0 }}>
+            <Container onClick={onClickHandler} component={"p"} sx={{ m: 0 }}>
               ERROR
-            </Box>
+            </Container>
             <CloseIcon onMouseDown={onClickCloseIconHandler} />
           </Stack>
           {openDetail && (

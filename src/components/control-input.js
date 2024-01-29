@@ -8,6 +8,7 @@ export const ControlInput = memo((props) => {
   const { onChange = () => {}, id, label, type, value, disabled } = props;
 
   switch (type) {
+    case "number":
     case "int":
     case "float":
       return <NumberInput {...props} />;

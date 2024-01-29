@@ -215,7 +215,7 @@ export const MQTTCenter = () => {
 
   useEffect(() => {
     if (!client.current) {
-      hostname = window.location.hostname;
+      hostname = "172.29.11.49"; //window.location.hostname;
       options.clientId = `${serviceName}-${Math.random().toString(16).substring(2, 8)}`;
       const _url = `ws://${hostname}:${PORT}`;
       // watch WebSocket Connection timeout
@@ -226,14 +226,14 @@ export const MQTTCenter = () => {
           updateErrorLog({
             cmd: "error",
             msg: { timestamp: new Date().toLocaleString(), message: err },
+            open_snackbar: true,
           })
         );
-      }, 100000);
+      }, 10000);
       client.current = mqtt.connect(_url, options);
       dispatch(updateState("connecting"));
     }
     if (client.current) {
-      clearTimeout(webSocketConnectTimeout.current);
       initEventHandler(client.current);
     }
 
@@ -244,13 +244,14 @@ export const MQTTCenter = () => {
       }
       console.log("Cleanup MQTT");
       dispatch(updateState("disconnected"));
+      if (webSocketConnectTimeout.current) clearTimeout(webSocketConnectTimeout.current);
 
       // release memory
       vacuumData = null;
       n2PressureData = null;
       o2ContentData = null;
     };
-  }, [client.current]);
+  }, [client.current, webSocketConnectTimeout.current]);
 
   useProcessTasks(client, fifoTaskSelector, mqttStateSelector, dispatch);
   useInitSubscribePublish(client, dispatch);
@@ -264,12 +265,20 @@ export const MQTTCenter = () => {
   };
 
   const connectHandler = (_) => {
+    clearTimeout(webSocketConnectTimeout.current);
     console.log("MQTT connected.");
     dispatch(updateState("connected"));
   };
 
   const errorHandler = (err) => {
     console.error("MQTT error occurred: ", err);
+    dispatch(
+      updateErrorLog({
+        cmd: "error",
+        msg: { timestamp: new Date().toLocaleString(), message: err },
+        open_snackbar: true,
+      })
+    );
     dispatch(updateState("error"));
   };
 
@@ -313,24 +322,15 @@ export const MQTTCenter = () => {
         if (cmd === "vacuum_pressure") {
           vacuumPressureDataSegmentLength += msg.length;
           vacuumData = appendData(msg, vacuumData, BUFFER_MAX_SIZE);
-          if (vacuumPressureDataSegmentLength >= UPDATE_BATCH) {
-            dispatch(updateVacuumData(vacuumData));
-            vacuumPressureDataSegmentLength = 0;
-          }
+          dispatch(updateVacuumData(vacuumData));
         } else if (cmd === "n2_pressure") {
           n2PressureDataSegmentLength += msg.length;
           n2PressureData = appendData(msg, n2PressureData, BUFFER_MAX_SIZE);
-          if (n2PressureDataSegmentLength >= UPDATE_BATCH) {
-            dispatch(updateN2PressureData(n2PressureData));
-            n2PressureDataSegmentLength = 0;
-          }
+          dispatch(updateN2PressureData(n2PressureData));
         } else if (cmd === "o2_content") {
           o2ContentDataSegmentLength += msg.length;
           o2ContentData = appendData(msg, o2ContentData, BUFFER_MAX_SIZE);
-          if (o2ContentDataSegmentLength >= UPDATE_BATCH) {
-            dispatch(updateO2LevelData(o2ContentData));
-            o2ContentDataSegmentLength = 0;
-          }
+          dispatch(updateO2LevelData(o2ContentData));
         }
         break;
       case TOPIC_LOG_STATUS:

@@ -47,6 +47,7 @@ export const NumberInput = (props) => {
     case "int":
       handleChange = handleChangeInt;
       break;
+    case "number":
     case "float":
       handleChange = handleChangeFloat;
       break;

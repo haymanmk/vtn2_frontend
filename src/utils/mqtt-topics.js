@@ -17,3 +17,5 @@ export const TOPIC_OUTPUT_STATUS = "output/status";
 export const TOPIC_OUTPUT_COMMAND = "output/command";
 export const TOPIC_SYSTEM_INFO_STATUS = "system_info/status";
 export const TOPIC_SYSTEM_INFO_COMMAND = "system_info/command";
+export const TOPIC_SYSTEM_DIAGNOSIS_STATUS = "system_diagnosis/status";
+export const TOPIC_SYSTEM_DIAGNOSIS_COMMAND = "system_diagnosis/command";

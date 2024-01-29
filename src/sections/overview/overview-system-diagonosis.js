@@ -1,9 +1,10 @@
-import { Avatar, Card, CardContent, Slider, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Card, CardContent, Slider, Stack, Typography } from "@mui/material";
 import TroubleshootIcon from "@mui/icons-material/Troubleshoot";
 import { SliderWithMetric } from "src/components/slider-with-metric";
+import { memo } from "react";
 
-export const OverviewSystemDiagnosis = (props) => {
-  const { sx } = props;
+export const OverviewSystemDiagnosis = memo((props) => {
+  const { value = {}, sx } = props;
   return (
     <Card sx={sx}>
       <CardContent>
@@ -17,15 +18,21 @@ export const OverviewSystemDiagnosis = (props) => {
             <Typography color={"text.secondary"} variant="overline">
               System Health Diagnosis
             </Typography>
-            <Typography gutterBottom>Compressed Air (MPa)</Typography>
-            <SliderWithMetric
-              valueLabelDisplay="auto"
-              value={1}
-              min={-0.5}
-              max={2}
-              metricMin={0.5}
-              metricMax={1.5}
-            />
+            {Object.keys(value).length
+              ? Object.entries(value).map(([key, value]) => (
+                  <Box key={key}>
+                    <Typography gutterBottom>{value.title}</Typography>
+                    <SliderWithMetric
+                      valueLabelDisplay="auto"
+                      value={value.value}
+                      min={value.min}
+                      max={value.max}
+                      metricMin={value.metricMin}
+                      metricMax={value.metricMax}
+                    />
+                  </Box>
+                ))
+              : null}
           </Stack>
           <Avatar sx={{ backgroundColor: "info.dark", height: 56, width: 56 }}>
             <TroubleshootIcon />
@@ -34,4 +41,4 @@ export const OverviewSystemDiagnosis = (props) => {
       </CardContent>
     </Card>
   );
-};
+});

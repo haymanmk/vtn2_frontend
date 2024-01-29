@@ -73,8 +73,8 @@ export const GraphPlotter = memo((props) => {
   useEffect(() => {
     if (!boxRef.current) return;
     const resizeObzerver = new ResizeObserver(() => {
-      setWidth(boxRef.current.clientWidth);
-      setHeight(boxRef.current.clientHeight);
+      setWidth(boxRef.current?.clientWidth);
+      setHeight(boxRef.current?.clientHeight);
     });
     resizeObzerver.observe(boxRef.current);
 
