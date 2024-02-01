@@ -4,7 +4,9 @@ import { SettingsNotifications } from "src/sections/settings/settings-notificati
 import { SettingsPassword } from "src/sections/settings/settings-password";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
 import { TreeViewInput } from "src/components/tree-view-input";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const DEBUG = true;
 
 const mockConfigs = [
   {
@@ -135,9 +137,86 @@ const mockConfigs = [
     },
   },
 ];
+/**
+ *
+ * @param {Array} config
+ */
+const initiateExpandValue = (config) => {
+  let result = {};
+
+  const bfs = (obj, id = "", route = []) => {
+    Object.entries(obj).map(([key, value]) => {
+      if (typeof value === "object") {
+        const _id = `${id}.${key}`;
+        result = { ...result, [_id]: { expand: false, route: [...route, key] } };
+        if (!("value" in value)) {
+          bfs(value, _id, [...route, key]);
+        }
+      }
+    });
+  };
+
+  config.map((confObj) => {
+    bfs(confObj);
+  });
+
+  return result;
+};
 
 const Page = () => {
-  const inputChange = useCallback(() => {}, []);
+  const [config, setConfig] = useState(mockConfigs);
+  const [expand, setExpand] = useState({});
+  const initiated = useRef(false);
+
+  if (!config) return;
+
+  useEffect(() => {
+    if (initiated.current) return;
+
+    let _configs;
+    if (Array.isArray(config)) {
+      _configs = [...config];
+    } else _configs = [config];
+    const newExpand = initiateExpandValue(_configs);
+    if (DEBUG) console.log("Expand", newExpand);
+    setExpand(newExpand);
+
+    initiated.current = true;
+  }, [initiated, config, setExpand]);
+
+  const onClick = useCallback(
+    (id) => {
+      setExpand((prev) => {
+        return { ...prev, [id]: { ...prev[id], expand: !prev[id].expand } };
+      });
+    },
+    [setExpand]
+  );
+
+  const updateConfig = (config, route, value) => {
+    console.log(config, route, value);
+    if (route.length === 0) return { ...config, value };
+    const key = route.shift();
+    if (key in config) return { ...config, [key]: updateConfig(config[key], route, value) };
+  };
+
+  const inputChange = useCallback(
+    (route, value) => {
+      if (DEBUG) console.log({ route, value });
+      if (route.length === 0) return;
+      const index = config.findIndex((e) => route[0] in e);
+      const obj = config[index];
+      if (obj)
+        setConfig((prev) => {
+          const newConfig = [...prev];
+          newConfig[index] = updateConfig(obj, [...route], value);
+          console.log("newConfig", newConfig);
+          return newConfig;
+        });
+    },
+    [config, setConfig]
+  );
+
   return (
     <>
       <Head>
@@ -153,7 +232,12 @@ const Page = () => {
         <Container maxWidth="lg">
           <Stack spacing={3}>
             <Typography variant="h4">Settings</Typography>
-            <TreeViewInput configs={mockConfigs} onChange={inputChange} />
+            <TreeViewInput
+              configs={config}
+              onChange={inputChange}
+              onClick={onClick}
+              expand={expand}
+            />
           </Stack>
         </Container>
       </Box>
