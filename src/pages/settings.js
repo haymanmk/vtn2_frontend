@@ -8,8 +8,14 @@ import { useCallback } from "react";
 
 const mockConfigs = [
   {
+    "@title": "Parameters",
+    "@subtitle": "Process parameters",
     airtight_config: {
+      "@label": "Leakage Verification",
+      "@comment": "Parameters for Leakage Verification",
       PressureConfig: {
+        "@label": "Pressure",
+        "@comment": "Coefficient related to pressure monitoring",
         pPressure_high: {
           type: "number",
           label: "pPmax pressure",
@@ -32,6 +38,8 @@ const mockConfigs = [
         },
       },
       TimeConfig: {
+        "@label": "Time Span",
+        "@comment": "Time Span Settings",
         pTime_pressureChoke: {
           type: "number",
           label: "pTime_pressureChoke",
@@ -59,10 +67,12 @@ const mockConfigs = [
         },
       },
     },
-  },
-  {
     cleanup_config: {
+      "@label": "Clean Up",
+      "@comment": "Refresh sensor chamber",
       TimeConfig: {
+        "@label": "Time Span",
+        "@comment": "Time Span Settings",
         pTime_vacuumclose: {
           type: "number",
           label: "pTime_vacuumclose",
@@ -85,6 +95,8 @@ const mockConfigs = [
         },
       },
       O2Config: {
+        "@label": "O2 Concentration",
+        "@comment": "Stop process if target O2 content is reached",
         pConcentration_cleanup: {
           type: "number",
           label: "pConcentration_cleanup",
