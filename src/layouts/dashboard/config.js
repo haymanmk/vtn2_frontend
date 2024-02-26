@@ -51,7 +51,7 @@ export const items = [
     ),
   },
   {
-    title: "Configuration",
+    title: "Settings",
     path: "/settings",
     icon: (
       <SvgIcon fontSize="small">

@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, Divider, Grid } from "@mui/material";
+import { Avatar, Card, CardContent, CardHeader, Divider, Grid } from "@mui/material";
 import { LabeledSwtich } from "src/components/labeled-switch";
 import { memo, useMemo } from "react";
 import { ControlInput } from "src/components/control-input";
@@ -8,7 +8,7 @@ const OutputStatus = (props) => {
   const outputStatus = useMemo(() => props.outputStatus, [props.outputStatus]);
   return (
     <Card>
-      <CardHeader title="Outputs" />
+      <CardHeader avatar={<Avatar sx={{ bgcolor: "neutral.900" }}>O</Avatar>} title="Outputs" />
       <Divider />
       <CardContent>
         <Grid container spacing={3} wrap="wrap">

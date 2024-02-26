@@ -1,10 +1,27 @@
 import Head from "next/head";
-import { Box, Container, Stack, Typography } from "@mui/material";
-import { SettingsNotifications } from "src/sections/settings/settings-notifications";
-import { SettingsPassword } from "src/sections/settings/settings-password";
+import {
+  Avatar,
+  Box,
+  Button,
+  Card,
+  CardActions,
+  CardContent,
+  CardHeader,
+  Container,
+  Divider,
+  IconButton,
+  List,
+  Menu,
+  MenuItem,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
 import { TreeViewInput } from "src/components/tree-view-input";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { useSelector } from "react-redux";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 
 const DEBUG = true;
 
@@ -137,85 +154,166 @@ const mockConfigs = [
     },
   },
 ];
-/**
- *
- * @param {Array} config
- */
-const initiateExpandValue = (config) => {
-  let result = {};
 
-  const bfs = (obj, id = "", route = []) => {
-    Object.entries(obj).map(([key, value]) => {
-      if (typeof value === "object") {
-        const _id = `${id}.${key}`;
-        result = { ...result, [_id]: { expand: false, route: [...route, key] } };
-        if (!("value" in value)) {
-          bfs(value, _id, [...route, key]);
-        }
-      }
-    });
+const searchFirstKey = (obj) => Object.keys(obj).filter((key) => !key.startsWith("@"))[0];
+
+const TreeViewComponent = memo((props) => {
+  const { configs, editable, saveChanged, refreshConfig, ...restProps } = props;
+  const [_configs, _setConfigs] = useState(configs);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const openMenu = Boolean(anchorEl);
+  const [collapseAll, setCollapseAll] = useState(false);
+  const [expandAll, setExpandAll] = useState(false);
+  const [editting, setEditting] = useState(false);
+  const disabled = Boolean(!editting);
+
+  if (!_configs) return;
+
+  const updateConfig = (configs, route, value) => {
+    if (route.length === 0) return { ...configs, value };
+    let _route = [...route];
+    const key = _route.shift();
+    if (key in configs) return { ...configs, [key]: updateConfig(configs[key], _route, value) };
   };
 
-  config.map((confObj) => {
-    bfs(confObj);
-  });
-
-  return result;
-};
-
-const Page = () => {
-  const [config, setConfig] = useState(mockConfigs);
-  const [expand, setExpand] = useState({});
-  const initiated = useRef(false);
-
-  if (!config) return;
-
-  useEffect(() => {
-    if (initiated.current) return;
-
-    let _configs;
-    if (Array.isArray(config)) {
-      _configs = [...config];
-    } else _configs = [config];
-    const newExpand = initiateExpandValue(_configs);
-    if (DEBUG) console.log("Expand", newExpand);
-    setExpand(newExpand);
-
-    initiated.current = true;
-  }, [initiated, config, setExpand]);
-
-  const onClick = useCallback(
-    (id) => {
-      setExpand((prev) => {
-        return { ...prev, [id]: { ...prev[id], expand: !prev[id].expand } };
-      });
-    },
-    [setExpand]
-  );
-
-  const updateConfig = (config, route, value) => {
-    console.log(config, route, value);
-    if (route.length === 0) return { ...config, value };
-    const key = route.shift();
-    if (key in config) return { ...config, [key]: updateConfig(config[key], route, value) };
-  };
-
-  const inputChange = useCallback(
+  const onChange = useCallback(
     (route, value) => {
       if (DEBUG) console.log({ route, value });
       if (route.length === 0) return;
-      const index = config.findIndex((e) => route[0] in e);
-      const obj = config[index];
-      if (obj)
-        setConfig((prev) => {
-          const newConfig = [...prev];
-          newConfig[index] = updateConfig(obj, [...route], value);
-          console.log("newConfig", newConfig);
-          return newConfig;
-        });
+      _setConfigs((prev) => {
+        const newConfig = updateConfig(prev, [...route], value);
+        console.log("newConfig", newConfig);
+        return newConfig;
+      });
     },
-    [config, setConfig]
+    [_configs]
   );
+
+  const readTargetKeyValue = (obj, target) => {
+    let result = Object.keys(obj).filter((key) => key === target);
+    if (result.length) return obj[result[0]];
+  };
+
+  const menuButtonClick = useCallback((event) => {
+    setExpandAll(false);
+    setCollapseAll(false);
+    setAnchorEl(event.currentTarget);
+  }, []);
+
+  const handleMenuClose = useCallback(() => {
+    setAnchorEl(null);
+  }, []);
+
+  const handleExpandAll = useCallback(
+    (event) => {
+      setCollapseAll(false);
+      setExpandAll(true);
+      setAnchorEl(null);
+    },
+    [setExpandAll, setAnchorEl]
+  );
+  const handleCollapseAll = useCallback(
+    (event) => {
+      setExpandAll(false);
+      setCollapseAll(true);
+      setAnchorEl(null);
+    },
+    [setCollapseAll, setAnchorEl]
+  );
+
+  const editButtonClick = useCallback((event) => {
+    if (editable) setEditting(true);
+  }, []);
+
+  const cancelButtonClick = useCallback(
+    (event) => {
+      refreshConfig(searchFirstKey(_configs));
+      setEditting(false);
+    },
+    [_configs, refreshConfig]
+  );
+
+  const saveButtonClick = useCallback(
+    (event) => {
+      if (DEBUG) console.log("save configs", _configs);
+      saveChanged(_configs);
+      setEditting(false);
+    },
+    [_configs]
+  );
+
+  return (
+    <Card>
+      <CardHeader
+        avatar={
+          <Avatar sx={{ bgcolor: "neutral.900" }} aria-label="">
+            {(readTargetKeyValue(_configs, "@title") || Object.keys(_configs)[0])[0].toUpperCase()}
+          </Avatar>
+        }
+        action={
+          <Box>
+            <IconButton onClick={menuButtonClick}>
+              <MoreVertIcon />
+            </IconButton>
+            <Menu id="more_options" anchorEl={anchorEl} open={openMenu} onClose={handleMenuClose}>
+              <MenuItem onClick={handleExpandAll}>Expand All</MenuItem>
+              <MenuItem onClick={handleCollapseAll}>Collapse All</MenuItem>
+            </Menu>
+          </Box>
+        }
+        title={readTargetKeyValue(_configs, "@title") || Object.keys(_configs)[0]}
+        subheader={readTargetKeyValue(_configs, "@subtitle")}
+      />
+      <Divider />
+      <CardContent>
+        <List>
+          <TreeViewInput
+            value={_configs}
+            onChange={onChange}
+            expandAll={expandAll}
+            collapseAll={collapseAll}
+            disabled={disabled}
+            {...restProps}
+          />
+        </List>
+      </CardContent>
+      <Divider />
+      <CardActions sx={{ justifyContent: "flex-end" }} disableSpacing>
+        {!editting ? (
+          <Button disabled={!editable} onClick={editButtonClick}>
+            EDIT
+          </Button>
+        ) : null}
+        {editting ? <Button onClick={cancelButtonClick}>CANCEL</Button> : null}
+        {editting ? <Button onClick={saveButtonClick}>SAVE</Button> : null}
+      </CardActions>
+    </Card>
+  );
+});
+
+const Page = () => {
+  const configs = useSelector((state) => mockConfigs);
+  const [_configs, setConfigs] = useState([]);
+  const [editable, setEditable] = useState(true);
+
+  if (!configs) return;
+
+  useEffect(() => {
+    if (!Array.isArray(configs)) setConfigs([configs]);
+    else setConfigs([...configs]);
+    return () => {
+      setConfigs([]);
+    };
+  }, [configs, setConfigs]);
+
+  const saveChanged = useCallback((newConfigs) => {
+    const targetTopic = searchFirstKey(newConfigs);
+    if (DEBUG) console.log("Target topic: ", targetTopic);
+  }, []);
+
+  const refreshConfig = useCallback((target) => {
+    if (DEBUG) console.log(`Refresh target config: ${target}`);
+  }, []);
 
   return (
     <>
@@ -232,12 +330,15 @@ const Page = () => {
         <Container maxWidth="lg">
           <Stack spacing={3}>
             <Typography variant="h4">Settings</Typography>
-            <TreeViewInput
-              configs={config}
-              onChange={inputChange}
-              onClick={onClick}
-              expand={expand}
-            />
+            {_configs.map((configObj, index) => (
+              <TreeViewComponent
+                key={index}
+                configs={configObj}
+                editable={editable}
+                saveChanged={saveChanged}
+                refreshConfig={refreshConfig}
+              />
+            ))}
           </Stack>
         </Container>
       </Box>

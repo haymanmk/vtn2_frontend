@@ -1,5 +1,4 @@
 import Head from "next/head";
-import { subDays, subHours } from "date-fns";
 import { Box, Container, Unstable_Grid2 as Grid } from "@mui/material";
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
 import { OverviewCPUTemperature } from "src/sections/overview/overview-cpu-temperature";
@@ -7,42 +6,12 @@ import { OverviewSystemInfo } from "src/sections/overview/overview-system-info";
 import { OverviewCPUInfo } from "src/sections/overview/overview-cpu-info";
 import { useDispatch, useSelector } from "react-redux";
 import { OverviewSystemDiagnosis } from "src/sections/overview/overview-system-diagonosis";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { MQTTStoreAction } from "src/redux/mqtt-client-slice";
 import {
   TOPIC_SYSTEM_DIAGNOSIS_COMMAND,
   TOPIC_SYSTEM_DIAGNOSIS_STATUS,
 } from "src/utils/mqtt-topics";
-
-const now = new Date();
-const mockSystemInfo = {
-  cpu: {
-    manufacturer: "Sony UK",
-    brand: "BCM2711",
-    vendor: "ARM",
-    family: "Cortex-A72",
-  },
-  cpuTemperature: { main: 49.66 },
-  osInfo: {
-    platform: "linux",
-    distro: "Raspbian GNU/Linux",
-    release: "12",
-    codename: "bookworm",
-    kernel: "6.1.0-rpi4-rpi-v8",
-    arch: "arm",
-  },
-  system: {
-    manufacturer: "Raspberry Pi Foundation",
-    model: "Raspberry Pi 4 Model B Rev 1.4",
-    version: "d03114",
-    raspberry: {
-      manufacturer: "Sony UK",
-      processor: "BCM2711",
-      type: "4B",
-      revision: "1.4",
-    },
-  },
-};
 
 const Page = () => {
   const dispatch = useDispatch();
@@ -69,7 +38,7 @@ const Page = () => {
   return (
     <>
       <Head>
-        <title>Overview | Devias Kit</title>
+        <title>Overview | VTN2</title>
       </Head>
       <Box
         component="main"

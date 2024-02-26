@@ -1,15 +1,4 @@
-import {
-  Card,
-  CardActions,
-  CardContent,
-  CardHeader,
-  Collapse,
-  Divider,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-} from "@mui/material";
+import { Collapse, Divider, List, ListItem, ListItemButton, ListItemText } from "@mui/material";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ControlInput } from "./control-input";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -17,17 +6,47 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
 const DEBUG = true;
 
-const TreeViewComponents = memo((props) => {
+/**
+ *
+ * @param {Objectj} config
+ */
+const initiateFlattenStruct = (config) => {
+  if (typeof config !== "object" || Array.isArray(config))
+    throw new Error("config shall be an object");
+
+  let result = {};
+
+  const bfs = (obj, id = "", route = []) => {
+    Object.entries(obj).map(([key, value]) => {
+      if (typeof value === "object") {
+        const _id = `${id}.${key}`;
+        result = { ...result, [_id]: { expand: false, route: [...route, key] } };
+        if (!("value" in value)) {
+          bfs(value, _id, [...route, key]);
+        }
+      }
+    });
+  };
+
+  bfs(config);
+  return result;
+};
+
+const TreeViewInputComponent = memo((props) => {
   const { value, id = "", ...restProps } = props;
-  const { onChange, onClick, expand } = restProps;
+  const { onChange, onClick, flattenStruct, disabled } = restProps;
 
   if (DEBUG) console.log("id: ", id);
+
+  if (!value) return;
+
   /**
    * @brief check if an input is an object
    * @param {Object} obj
    * @returns true: is an object; false: not an object
    */
   const isObject = (obj) => typeof obj === "object";
+
   return (
     <>
       {Object.entries(value).map(([key, _value]) => {
@@ -40,8 +59,9 @@ const TreeViewComponents = memo((props) => {
                 <ControlInput
                   id={_id}
                   onChange={(_id, value) => {
-                    onChange(expand[_id].route, value);
+                    onChange(flattenStruct[_id].route, value);
                   }}
+                  disabled={disabled}
                   {..._value}
                 />
               </ListItem>
@@ -58,12 +78,12 @@ const TreeViewComponents = memo((props) => {
                     primary={"@label" in _value ? _value["@label"] : key}
                     secondary={"@comment" in _value ? _value["@comment"] : null}
                   />
-                  {expand[_id].expand ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                  {flattenStruct[_id].expand ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                 </ListItemButton>
                 <Divider />
-                <Collapse in={expand[_id].expand} unmountOnExit>
+                <Collapse in={flattenStruct[_id].expand} unmountOnExit>
                   <List component={"div"} sx={{ pl: 4 }} disablePadding>
-                    <TreeViewComponents value={_value} id={_id} {...restProps} />
+                    <TreeViewInputComponent value={_value} id={_id} {...restProps} />
                   </List>
                 </Collapse>
               </div>
@@ -75,43 +95,52 @@ const TreeViewComponents = memo((props) => {
   );
 });
 
+const batchOnOffExpand = (obj, state = false) => {
+  const _obj = { ...obj };
+  Object.keys(_obj).map((key) => {
+    _obj[key].expand = state;
+  });
+  return _obj;
+};
+
 export const TreeViewInput = memo((props) => {
-  const { configs, onChange, onClick, expand } = props;
+  const { value, expandAll, collapseAll, ...restProps } = props;
+  const [flattenStruct, setFlattenStruct] = useState({});
+  const [initiated, setInitiated] = useState(false);
 
-  const [_configs, setConfigs] = useState([]);
-
-  if (!configs) return;
   useEffect(() => {
-    if (!Array.isArray(configs)) setConfigs([configs]);
-    else setConfigs([...configs]);
-    return () => {
-      setConfigs([]);
-    };
-  }, [configs, setConfigs]);
+    if (initiated) return;
 
-  const readTargetKeyValue = (obj, target) => {
-    let result = Object.keys(obj).filter((key) => key === target);
-    if (result.length) return obj[result[0]];
-  };
+    const newFlattenStruct = initiateFlattenStruct(value);
+    if (DEBUG) console.log("Expand", newFlattenStruct);
+    setFlattenStruct(newFlattenStruct);
 
-  const createCard = (obj, index) => {
-    return (
-      <Card key={index}>
-        <CardHeader
-          title={readTargetKeyValue(obj, "@title") || Object.keys(obj)[0]}
-          subheader={readTargetKeyValue(obj, "@subtitle")}
-        />
-        <Divider />
-        <CardContent>
-          <List>
-            <TreeViewComponents value={obj} onChange={onChange} onClick={onClick} expand={expand} />
-          </List>
-        </CardContent>
-        <Divider />
-        <CardActions></CardActions>
-      </Card>
-    );
-  };
+    setInitiated(true);
+  }, [initiated, value]);
 
-  return <>{_configs.length && Object.keys(expand).length ? _configs.map(createCard) : null}</>;
+  useEffect(() => {
+    if (!initiated) return;
+    if (expandAll) setFlattenStruct((prev) => batchOnOffExpand(prev, true));
+  }, [initiated, expandAll]);
+
+  useEffect(() => {
+    if (!initiated) return;
+    if (collapseAll) setFlattenStruct((prev) => batchOnOffExpand(prev, false));
+  }, [initiated, collapseAll]);
+
+  const onClick = useCallback((id) => {
+    setFlattenStruct((prev) => {
+      return { ...prev, [id]: { ...prev[id], expand: !prev[id].expand } };
+    });
+  }, []);
+
+  if (!initiated) return;
+  return (
+    <TreeViewInputComponent
+      value={value}
+      flattenStruct={flattenStruct}
+      onClick={onClick}
+      {...restProps}
+    />
+  );
 });
