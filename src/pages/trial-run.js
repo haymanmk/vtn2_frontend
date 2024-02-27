@@ -42,8 +42,7 @@ const useHookParameterChange = (
   setSelectedProgram,
   selectedProgram,
   setRecipeList,
-  setParameters,
-  parameterBackup
+  setParameters
 ) => {
   useEffect(() => {
     if (mqttState !== "connected") return;
@@ -69,14 +68,14 @@ const useHookParameterChange = (
         if (selectedProgram === "") setSelectedProgram(msg[0]);
         break;
       case "read":
-        parameterBackup.current = msg;
         setParameters(msg);
         break;
     }
   }, [parameterStatusSelector, setSelectedProgram, selectedProgram]);
 
   useEffect(() => {
-    dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
+    if (selectedProgram)
+      dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
   }, [selectedProgram]);
 };
 
@@ -128,7 +127,6 @@ const Page = () => {
   const [startAllowed, setStartAllowed] = useState(false); // allow to start trial run mode
   const [controls, setControls] = useState({});
   const [editing, setEditing] = useState(false);
-  const parameterBackup = useRef(); // parameter backup for recovering the edited parameters
 
   const dispatch = useDispatch();
   const mqttState = useSelector((state) => state.MQTTClient.state);
@@ -174,7 +172,6 @@ const Page = () => {
   useEffect(() => {
     if (operationState !== "running") {
       setStartAllowed(true);
-      startTrialRun();
     } else {
       if (DEBUG_MESSAGE) console.log(`Operation State: ${JSON.stringify(msg)}`);
       setStartAllowed(false);
@@ -187,8 +184,7 @@ const Page = () => {
     setSelectedProgram,
     selectedProgram,
     setRecipeList,
-    setParameters,
-    parameterBackup
+    setParameters
   );
 
   useHookControlItemChange(dispatch, mqttState, setControls);
@@ -317,7 +313,7 @@ const Page = () => {
                     handleRecipeSelect={handleRecipeSelect}
                     onChange={onChangeParameter}
                     xs={XS}
-                    disabled={editing}
+                    disabled={!editing}
                   />
                 </ContentSelector>
                 <ContentSelector value={selectedTab} index={1}>
@@ -350,7 +346,7 @@ const Page = () => {
                   </Button>
                 )}
                 {!editing && selectedTab === 0 && (
-                  <Button size="small" onClick={onClick_Edit}>
+                  <Button size="small" onClick={onClick_Edit} disabled={!startAllowed}>
                     EDIT
                   </Button>
                 )}

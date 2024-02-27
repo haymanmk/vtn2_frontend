@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useState } from "react";
-import { Box, Button, Divider, Grid, MenuItem } from "@mui/material";
+import { Box, Button, Divider, Grid, List, MenuItem } from "@mui/material";
 import { ControlInput } from "src/components/control-input";
 import { StyledSelector } from "src/components/styled-selector";
+import { TreeViewInput } from "src/components/tree-view-input";
 
 export const Parameters = memo((props) => {
   const {
@@ -26,7 +27,7 @@ export const Parameters = memo((props) => {
               size="small"
               value={selectedProgram || ""}
               onChange={handleRecipeSelect}
-              disabled={disabled}
+              // disabled={disabled}
             >
               {recipeOptions &&
                 recipeOptions.map((option, i) => (
@@ -39,7 +40,7 @@ export const Parameters = memo((props) => {
         </Grid>
       </Box>
       <Box component={"div"} sx={{ flexGrow: 2, marginBottom: "20px" }}>
-        <Grid container spacing={3} wrap="wrap">
+        {/* <Grid container spacing={3} wrap="wrap">
           {parameters &&
             Object.entries(parameters).map(([key, value]) => (
               <Grid
@@ -51,7 +52,16 @@ export const Parameters = memo((props) => {
                 <ControlInput id={key} onChange={onChange} disabled={!disabled} {...value} />
               </Grid>
             ))}
-        </Grid>
+        </Grid> */}
+        <List>
+          <TreeViewInput
+            value={parameters}
+            onChange={onChange}
+            expandAll={true}
+            collapseAll={false}
+            disabled={disabled}
+          />
+        </List>
       </Box>
     </Box>
   );

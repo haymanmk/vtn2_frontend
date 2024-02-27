@@ -1,8 +1,6 @@
 import { Collapse, Divider, List, ListItem, ListItemButton, ListItemText } from "@mui/material";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ControlInput } from "./control-input";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
 const DEBUG = true;
 
@@ -78,7 +76,6 @@ const TreeViewInputComponent = memo((props) => {
                     primary={"@label" in _value ? _value["@label"] : key}
                     secondary={"@comment" in _value ? _value["@comment"] : null}
                   />
-                  {flattenStruct[_id].expand ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                 </ListItemButton>
                 <Divider />
                 <Collapse in={flattenStruct[_id].expand} unmountOnExit>
