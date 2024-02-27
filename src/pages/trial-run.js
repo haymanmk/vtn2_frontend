@@ -30,6 +30,7 @@ import {
 
 const XS = 3;
 const MIN_HEIGHT = 550;
+const MAX_HEIGHT = 650;
 const DEBUG_MESSAGE = false;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
@@ -286,6 +287,7 @@ const Page = () => {
                 display: "flex",
                 flexDirection: "column",
                 minHeight: MIN_HEIGHT,
+                maxHeight: MAX_HEIGHT,
                 padding: "20px 30px",
               }}
             >

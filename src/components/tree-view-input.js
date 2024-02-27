@@ -1,14 +1,25 @@
 import { Collapse, Divider, List, ListItem, ListItemButton, ListItemText } from "@mui/material";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { ControlInput } from "./control-input";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
-const DEBUG = true;
+const DEBUG = false;
+
+function debugMessage() {
+  if (DEBUG) console.log(...arguments);
+}
+
+function isEmptyObject(obj) {
+  return Object.keys(obj).length === 0;
+}
 
 /**
  *
  * @param {Objectj} config
  */
 const initiateFlattenStruct = (config) => {
+  debugMessage(config);
   if (typeof config !== "object" || Array.isArray(config))
     throw new Error("config shall be an object");
 
@@ -34,7 +45,7 @@ const TreeViewInputComponent = memo((props) => {
   const { value, id = "", ...restProps } = props;
   const { onChange, onClick, flattenStruct, disabled } = restProps;
 
-  if (DEBUG) console.log("id: ", id);
+  debugMessage("id: ", id);
 
   if (!value) return;
 
@@ -76,6 +87,7 @@ const TreeViewInputComponent = memo((props) => {
                     primary={"@label" in _value ? _value["@label"] : key}
                     secondary={"@comment" in _value ? _value["@comment"] : null}
                   />
+                  {flattenStruct[_id].expand ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                 </ListItemButton>
                 <Divider />
                 <Collapse in={flattenStruct[_id].expand} unmountOnExit>
@@ -107,6 +119,7 @@ export const TreeViewInput = memo((props) => {
 
   useEffect(() => {
     if (initiated) return;
+    if (isEmptyObject(value)) return;
 
     const newFlattenStruct = initiateFlattenStruct(value);
     if (DEBUG) console.log("Expand", newFlattenStruct);
@@ -131,7 +144,7 @@ export const TreeViewInput = memo((props) => {
     });
   }, []);
 
-  if (!initiated) return;
+  if (!initiated || isEmptyObject(value)) return;
   return (
     <TreeViewInputComponent
       value={value}

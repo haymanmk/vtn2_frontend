@@ -39,20 +39,7 @@ export const Parameters = memo((props) => {
           </Grid>
         </Grid>
       </Box>
-      <Box component={"div"} sx={{ flexGrow: 2, marginBottom: "20px" }}>
-        {/* <Grid container spacing={3} wrap="wrap">
-          {parameters &&
-            Object.entries(parameters).map(([key, value]) => (
-              <Grid
-                key={key}
-                item
-                xs={xs}
-                sx={{ minWidth: minWidth - 50, display: "flex", alignItems: "center" }}
-              >
-                <ControlInput id={key} onChange={onChange} disabled={!disabled} {...value} />
-              </Grid>
-            ))}
-        </Grid> */}
+      <Box component={"div"} sx={{ flexGrow: 2, marginBottom: "20px", overflowY: "scroll" }}>
         <List>
           <TreeViewInput
             value={parameters}
