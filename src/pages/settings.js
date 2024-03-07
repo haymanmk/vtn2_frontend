@@ -20,8 +20,12 @@ import {
 import { Layout as DashboardLayout } from "src/layouts/dashboard/layout";
 import { TreeViewInput } from "src/components/tree-view-input";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { MQTTStoreAction } from "src/redux/mqtt-client-slice";
+import { TOPIC_SETTING_COMMAND, TOPIC_SETTING_STATUS } from "src/utils/mqtt-topics";
+import { ar, de } from "date-fns/locale";
+import { updateNestedConfig } from "src/utils/utils";
 
 const DEBUG = true;
 
@@ -155,6 +159,10 @@ const mockConfigs = [
   },
 ];
 
+function debugMessage() {
+  if (DEBUG) console.log(...arguments);
+}
+
 const searchFirstKey = (obj) => Object.keys(obj).filter((key) => !key.startsWith("@"))[0];
 
 const TreeViewComponent = memo((props) => {
@@ -167,22 +175,18 @@ const TreeViewComponent = memo((props) => {
   const [editting, setEditting] = useState(false);
   const disabled = Boolean(!editting);
 
-  if (!_configs) return;
-
-  const updateConfig = (configs, route, value) => {
-    if (route.length === 0) return { ...configs, value };
-    let _route = [...route];
-    const key = _route.shift();
-    if (key in configs) return { ...configs, [key]: updateConfig(configs[key], _route, value) };
-  };
+  useEffect(() => {
+    if (!configs) return;
+    _setConfigs(configs);
+  }, [configs, _setConfigs]);
 
   const onChange = useCallback(
     (route, value) => {
       if (DEBUG) console.log({ route, value });
       if (route.length === 0) return;
       _setConfigs((prev) => {
-        const newConfig = updateConfig(prev, [...route], value);
-        console.log("newConfig", newConfig);
+        const newConfig = updateNestedConfig(prev, [...route], value);
+        debugMessage("newConfig", newConfig);
         return newConfig;
       });
     },
@@ -227,7 +231,7 @@ const TreeViewComponent = memo((props) => {
 
   const cancelButtonClick = useCallback(
     (event) => {
-      refreshConfig(searchFirstKey(_configs));
+      refreshConfig();
       setEditting(false);
     },
     [_configs, refreshConfig]
@@ -235,7 +239,7 @@ const TreeViewComponent = memo((props) => {
 
   const saveButtonClick = useCallback(
     (event) => {
-      if (DEBUG) console.log("save configs", _configs);
+      debugMessage("save configs", _configs);
       saveChanged(_configs);
       setEditting(false);
     },
@@ -267,14 +271,16 @@ const TreeViewComponent = memo((props) => {
       <Divider />
       <CardContent>
         <List>
-          <TreeViewInput
-            value={_configs}
-            onChange={onChange}
-            expandAll={expandAll}
-            collapseAll={collapseAll}
-            disabled={disabled}
-            {...restProps}
-          />
+          {_configs ? (
+            <TreeViewInput
+              value={_configs}
+              onChange={onChange}
+              expandAll={expandAll}
+              collapseAll={collapseAll}
+              disabled={disabled}
+              {...restProps}
+            />
+          ) : null}
         </List>
       </CardContent>
       <Divider />
@@ -291,28 +297,47 @@ const TreeViewComponent = memo((props) => {
   );
 });
 
+const READ_SETTING_COMMAND = { [TOPIC_SETTING_COMMAND]: { cmd: "read", msg: null } };
+
 const Page = () => {
-  const configs = useSelector((state) => mockConfigs);
+  const configs = useSelector((state) => state.MQTTClient.message[TOPIC_SETTING_STATUS]);
   const [_configs, setConfigs] = useState([]);
   const [editable, setEditable] = useState(true);
-
-  if (!configs) return;
+  const dispatch = useDispatch();
+  const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
 
   useEffect(() => {
-    if (!Array.isArray(configs)) setConfigs([configs]);
-    else setConfigs([...configs]);
+    dispatch(subscribeMQTT(TOPIC_SETTING_STATUS));
+    dispatch(publishMQTT(READ_SETTING_COMMAND));
+
+    debugMessage("publish request to read settings");
+
     return () => {
-      setConfigs([]);
+      dispatch(unsubscribeMQTT(TOPIC_SETTING_STATUS));
     };
+  }, []);
+
+  useEffect(() => {
+    if (!configs) return;
+
+    const { cmd, msg } = configs;
+
+    if (cmd !== "read" && cmd !== "write") return;
+    if (typeof msg !== "object") return;
+    if (Object.keys(msg).length === 0) return;
+    if (!Array.isArray(msg)) setConfigs([msg]);
+    else setConfigs([...msg]);
+
+    debugMessage("update config", [msg]);
   }, [configs, setConfigs]);
 
   const saveChanged = useCallback((newConfigs) => {
-    const targetTopic = searchFirstKey(newConfigs);
-    if (DEBUG) console.log("Target topic: ", targetTopic);
+    dispatch(publishMQTT({ [TOPIC_SETTING_COMMAND]: { cmd: "write", msg: newConfigs } }));
   }, []);
 
-  const refreshConfig = useCallback((target) => {
-    if (DEBUG) console.log(`Refresh target config: ${target}`);
+  const refreshConfig = useCallback(() => {
+    debugMessage(`Refresh config`);
+    dispatch(publishMQTT(READ_SETTING_COMMAND));
   }, []);
 
   return (

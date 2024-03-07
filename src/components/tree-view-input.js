@@ -4,7 +4,7 @@ import { ControlInput } from "./control-input";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
-const DEBUG = false;
+const DEBUG = true;
 
 function debugMessage() {
   if (DEBUG) console.log(...arguments);
@@ -118,6 +118,7 @@ export const TreeViewInput = memo((props) => {
   const [initiated, setInitiated] = useState(false);
 
   useEffect(() => {
+    debugMessage("value: ", value);
     if (initiated) return;
     if (isEmptyObject(value)) return;
 

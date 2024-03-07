@@ -27,15 +27,20 @@ import {
   TOPIC_PARAMETER_COMMAND,
   TOPIC_PARAMETER_STATUS,
 } from "src/utils/mqtt-topics";
+import { updateNestedConfig } from "src/utils/utils";
 
 const XS = 3;
 const MIN_HEIGHT = 550;
 const MAX_HEIGHT = 650;
-const DEBUG_MESSAGE = false;
+const DEBUG_MESSAGE = true;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
 
-const READ_PARAMETERS = { [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } };
+const READ_RECIPE_LIST = { [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } };
+
+function debugMessage() {
+  if (DEBUG_MESSAGE) console.log(...arguments);
+}
 
 const useHookParameterChange = (
   dispatch,
@@ -48,7 +53,7 @@ const useHookParameterChange = (
   useEffect(() => {
     if (mqttState !== "connected") return;
     dispatch(subscribeMQTT(TOPIC_PARAMETER_STATUS));
-    dispatch(publishMQTT(READ_PARAMETERS));
+    dispatch(publishMQTT(READ_RECIPE_LIST));
 
     return () => {
       dispatch(unsubscribeMQTT(TOPIC_PARAMETER_STATUS));
@@ -146,7 +151,7 @@ const Page = () => {
 
   const startTrialRun = useCallback(
     (event) => {
-      if (selectedProgram.length)
+      if (selectedProgram)
         dispatch(
           publishMQTT({
             [TOPIC_OPERATION_MODE_COMMAND]: {
@@ -174,10 +179,9 @@ const Page = () => {
     if (operationState !== "running") {
       setStartAllowed(true);
     } else {
-      if (DEBUG_MESSAGE) console.log(`Operation State: ${JSON.stringify(msg)}`);
       setStartAllowed(false);
     }
-  }, [startTrialRun, setStartAllowed, operationState]);
+  }, [setStartAllowed, operationState]);
 
   useHookParameterChange(
     dispatch,
@@ -206,8 +210,13 @@ const Page = () => {
     [setSelectedProgram]
   );
   const onChangeParameter = useCallback(
-    (id, value) => {
-      setParameters((prev) => ({ ...prev, [id]: { ...prev[id], value: value } }));
+    (route, value) => {
+      debugMessage(`onChangeParameter: ${route} - ${value}`);
+      setParameters((prev) => {
+        const newConfig = updateNestedConfig(prev, route, value);
+        debugMessage("newConfig: ", newConfig);
+        return newConfig;
+      });
     },
     [setParameters]
   );
@@ -264,12 +273,12 @@ const Page = () => {
 
   const onClick_Cancel = useCallback(
     (event) => {
-      dispatch(publishMQTT(READ_PARAMETERS));
+      dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
       setTimeout(() => {
         setEditing(false);
       }, 200);
     },
-    [setEditing]
+    [setEditing, selectedProgram]
   );
 
   return (
