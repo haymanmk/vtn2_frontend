@@ -27,12 +27,20 @@ import {
   TOPIC_PARAMETER_COMMAND,
   TOPIC_PARAMETER_STATUS,
 } from "src/utils/mqtt-topics";
+import { updateNestedConfig } from "src/utils/utils";
 
 const XS = 3;
 const MIN_HEIGHT = 550;
-const DEBUG_MESSAGE = false;
+const MAX_HEIGHT = 650;
+const DEBUG_MESSAGE = true;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
+
+const READ_RECIPE_LIST = { [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } };
+
+function debugMessage() {
+  if (DEBUG_MESSAGE) console.log(...arguments);
+}
 
 const useHookParameterChange = (
   dispatch,
@@ -40,13 +48,12 @@ const useHookParameterChange = (
   setSelectedProgram,
   selectedProgram,
   setRecipeList,
-  setParameters,
-  parameterBackup
+  setParameters
 ) => {
   useEffect(() => {
     if (mqttState !== "connected") return;
     dispatch(subscribeMQTT(TOPIC_PARAMETER_STATUS));
-    dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "list", msg: null } }));
+    dispatch(publishMQTT(READ_RECIPE_LIST));
 
     return () => {
       dispatch(unsubscribeMQTT(TOPIC_PARAMETER_STATUS));
@@ -67,14 +74,14 @@ const useHookParameterChange = (
         if (selectedProgram === "") setSelectedProgram(msg[0]);
         break;
       case "read":
-        parameterBackup.current = msg;
         setParameters(msg);
         break;
     }
   }, [parameterStatusSelector, setSelectedProgram, selectedProgram]);
 
   useEffect(() => {
-    dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
+    if (selectedProgram)
+      dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
   }, [selectedProgram]);
 };
 
@@ -126,7 +133,6 @@ const Page = () => {
   const [startAllowed, setStartAllowed] = useState(false); // allow to start trial run mode
   const [controls, setControls] = useState({});
   const [editing, setEditing] = useState(false);
-  const parameterBackup = useRef(); // parameter backup for recovering the edited parameters
 
   const dispatch = useDispatch();
   const mqttState = useSelector((state) => state.MQTTClient.state);
@@ -143,15 +149,36 @@ const Page = () => {
     return arr;
   }, [vacuumLineData, n2PressureData, o2ContentData]);
 
+  const startTrialRun = useCallback(
+    (event) => {
+      if (selectedProgram)
+        dispatch(
+          publishMQTT({
+            [TOPIC_OPERATION_MODE_COMMAND]: {
+              cmd: "write",
+              msg: { mode: "trial-run", recipe_id: selectedProgram },
+            },
+          })
+        );
+    },
+    [selectedProgram]
+  );
+
+  const stopTrialRun = useCallback((event) => {
+    dispatch(
+      publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "emg-stop" } } })
+    );
+  }, []);
+
   // Read current operation state of backend control center.
   useEffect(() => {
     dispatch(publishMQTT({ [TOPIC_OPERATION_STATE_COMMAND]: { cmd: "read" } }));
   }, []);
 
   useEffect(() => {
-    if (operationState !== "running") setStartAllowed(true);
-    else {
-      if (DEBUG_MESSAGE) console.log(`Operation State: ${JSON.stringify(msg)}`);
+    if (operationState !== "running") {
+      setStartAllowed(true);
+    } else {
       setStartAllowed(false);
     }
   }, [setStartAllowed, operationState]);
@@ -162,8 +189,7 @@ const Page = () => {
     setSelectedProgram,
     selectedProgram,
     setRecipeList,
-    setParameters,
-    parameterBackup
+    setParameters
   );
 
   useHookControlItemChange(dispatch, mqttState, setControls);
@@ -184,17 +210,17 @@ const Page = () => {
     [setSelectedProgram]
   );
   const onChangeParameter = useCallback(
-    (id, value) => {
-      setParameters((prev) => ({ ...prev, [id]: { ...prev[id], value: value } }));
+    (route, value) => {
+      debugMessage(`onChangeParameter: ${route} - ${value}`);
+      setParameters((prev) => {
+        const newConfig = updateNestedConfig(prev, route, value);
+        debugMessage("newConfig: ", newConfig);
+        return newConfig;
+      });
     },
     [setParameters]
   );
-  const recoverParameters = useCallback(
-    (event) => {
-      setParameters((prev) => ({ ...prev, ...parameterBackup.current }));
-    },
-    [parameterBackup, setParameters]
-  );
+
   const submitParameterChanges = useCallback(
     (event) => {
       dispatch(
@@ -247,34 +273,13 @@ const Page = () => {
 
   const onClick_Cancel = useCallback(
     (event) => {
+      dispatch(publishMQTT({ [TOPIC_PARAMETER_COMMAND]: { cmd: "read", msg: selectedProgram } }));
       setTimeout(() => {
-        recoverParameters(event);
         setEditing(false);
       }, 200);
     },
-    [setEditing]
+    [setEditing, selectedProgram]
   );
-
-  const startTrialRun = useCallback(
-    (event) => {
-      if (selectedProgram.length)
-        dispatch(
-          publishMQTT({
-            [TOPIC_OPERATION_MODE_COMMAND]: {
-              cmd: "write",
-              msg: { mode: "trial-run", recipe_id: selectedProgram },
-            },
-          })
-        );
-    },
-    [selectedProgram]
-  );
-
-  const stopTrialRun = useCallback((event) => {
-    dispatch(
-      publishMQTT({ [TOPIC_OPERATION_MODE_COMMAND]: { cmd: "write", msg: { mode: "emg-stop" } } })
-    );
-  }, []);
 
   return (
     <>
@@ -291,6 +296,7 @@ const Page = () => {
                 display: "flex",
                 flexDirection: "column",
                 minHeight: MIN_HEIGHT,
+                maxHeight: MAX_HEIGHT,
                 padding: "20px 30px",
               }}
             >
@@ -318,7 +324,7 @@ const Page = () => {
                     handleRecipeSelect={handleRecipeSelect}
                     onChange={onChangeParameter}
                     xs={XS}
-                    disabled={editing}
+                    disabled={!editing}
                   />
                 </ContentSelector>
                 <ContentSelector value={selectedTab} index={1}>
@@ -351,7 +357,7 @@ const Page = () => {
                   </Button>
                 )}
                 {!editing && selectedTab === 0 && (
-                  <Button size="small" onClick={onClick_Edit}>
+                  <Button size="small" onClick={onClick_Edit} disabled={!startAllowed}>
                     EDIT
                   </Button>
                 )}

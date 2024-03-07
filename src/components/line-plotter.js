@@ -207,6 +207,15 @@ export const LinePlotter = (props) => {
       .attr("fill", "none")
       .attr("stroke-width", "2px")
       .attr("stroke", color);
+
+    // append dots
+    g.selectAll("dot")
+      .data(data)
+      .join("circle")
+      .attr("cx", (d) => $xScale(d[0]))
+      .attr("cy", (d) => $yScale(d[1]))
+      .attr("r", 3.5)
+      .style("fill", color);
   };
 
   // brush
