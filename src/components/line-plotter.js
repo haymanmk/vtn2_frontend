@@ -1,6 +1,7 @@
-import { useRef, useEffect, useState, memo } from "react";
+import { useRef, useEffect, useState, memo, useCallback } from "react";
 import * as d3 from "d3";
 import { indigo, neutral, success, warning } from "src/theme/colors";
+import styles from "./line-plotter.module.css";
 
 const colors = [indigo.main, neutral[500], warning.main, success.main];
 
@@ -34,6 +35,7 @@ export const LinePlotter = (props) => {
   const divRef = useRef();
   const gRef = useRef();
   const xAxis = useRef();
+  const tooltip = useRef();
 
   /**
    * Calculate canvas dimension
@@ -60,6 +62,16 @@ export const LinePlotter = (props) => {
    */
   useEffect(() => {
     if (!amountLines) return;
+
+    d3.select(divRef.current).selectAll(styles.tooltip).remove();
+    // create tooltip
+    if (!tooltip.current)
+      tooltip.current = d3
+        .select(divRef.current)
+        // .select("body")
+        .append("div")
+        .attr("class", styles.tooltip)
+        .style("opacity", 0);
 
     // append plot-area group
     const g = d3
@@ -98,6 +110,10 @@ export const LinePlotter = (props) => {
 
     // add brush
     if (brushed) g.append("g").attr("class", "brush").call($brush);
+
+    return () => {
+      d3.selectAll(styles.tooltip).remove();
+    };
   }, [
     gRef,
     amountLines,
@@ -114,6 +130,9 @@ export const LinePlotter = (props) => {
   useEffect(() => {
     if (!data) return;
     if (data?.length <= 0) return;
+
+    // remove tooltip to keep canvas clean
+    tooltip.current.style("opacity", 0);
 
     // update x scale
     $xScale.domain($extent(data, 0));
@@ -215,7 +234,18 @@ export const LinePlotter = (props) => {
       .attr("cx", (d) => $xScale(d[0]))
       .attr("cy", (d) => $yScale(d[1]))
       .attr("r", 3.5)
-      .style("fill", color);
+      .style("fill", color)
+      .on("mouseover", (event, d) => {
+        console.log("event", event);
+        tooltip.current.transition().duration(200).style("opacity", 0.7);
+        tooltip.current
+          .html(`x: ${Number(d[0]).toFixed(2)}<br/>y: ${Number(d[1].toFixed(2))}`)
+          .style("left", event.pageX + 15 + "px")
+          .style("top", event.pageY - 36 + "px");
+      })
+      .on("mouseout", (d) => {
+        tooltip.current.transition().duration(200).style("opacity", 0);
+      });
   };
 
   // brush

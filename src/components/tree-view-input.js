@@ -4,7 +4,7 @@ import { ControlInput } from "./control-input";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
-const DEBUG = true;
+const DEBUG = false;
 
 function debugMessage() {
   if (DEBUG) console.log(...arguments);

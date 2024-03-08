@@ -215,7 +215,8 @@ export const MQTTCenter = () => {
 
   useEffect(() => {
     if (!client.current) {
-      hostname = window.location.hostname; //"172.16.0.10";
+      // hostname = "172.29.11.49"; // window.location.hostname; //
+      hostname = window.location.hostname; //
       options.clientId = `${serviceName}-${Math.random().toString(16).substring(2, 8)}`;
       const _url = `ws://${hostname}:${PORT}`;
       // watch WebSocket Connection timeout

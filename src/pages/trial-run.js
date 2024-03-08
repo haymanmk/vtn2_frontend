@@ -32,7 +32,7 @@ import { updateNestedConfig } from "src/utils/utils";
 const XS = 3;
 const MIN_HEIGHT = 550;
 const MAX_HEIGHT = 650;
-const DEBUG_MESSAGE = true;
+const DEBUG_MESSAGE = false;
 
 const { subscribeMQTT, publishMQTT, unsubscribeMQTT } = MQTTStoreAction;
 

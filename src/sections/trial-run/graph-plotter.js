@@ -44,7 +44,7 @@ export const GraphPlotter = memo((props) => {
   const { data, minWidth, brushed, options } = props;
   const [width, setWidth] = useState(150);
   const [height, setHeight] = useState(150);
-  const [_lineOptions, setLineOptions] = useState([]);
+  const [_lineOptions, setLineOptions] = useState([]); // available line options, e.g. ["all", "mbar", "temp", "flow"]
   const [selectedLine, setSelectedLine] = useState("all");
   const [selectedData, setSelectedData] = useState([]);
   const [yLabel, setYLabel] = useState([]);
@@ -52,23 +52,45 @@ export const GraphPlotter = memo((props) => {
   const boxRef = useRef();
   const amountLines = useRef(0);
 
+  // hook for data change
   useEffect(() => {
     amountLines.current = countAmountLines(data);
-    setSelectedData(data);
     setNumLines(amountLines.current < MAX_LINES ? amountLines.current : MAX_LINES);
     if (amountLines.current <= 1) return;
 
+    if (selectedLine === "all") {
+      setSelectedData(data);
+      setNumLines(amountLines.current);
+    } else {
+      const index = _lineOptions.findIndex((e) => e === selectedLine);
+      setSelectedData(data[index - 1]);
+      setNumLines(1);
+    }
+  }, [data, _lineOptions, selectedLine, setSelectedData, setNumLines, setNumLines]);
+
+  // update y labels
+  useEffect(() => {
+    if ("y_labels" in options)
+      if (selectedLine === "all") {
+        setYLabel(options.y_labels);
+      } else {
+        const index = _lineOptions.findIndex((e) => e === selectedLine);
+        setYLabel([options.y_labels[index - 1]]);
+      }
+  }, [options, selectedLine, _lineOptions, setYLabel]);
+
+  // hook for options change
+  useEffect(() => {
     let _options = ["all"];
     if ("y_labels" in options)
       if (options.y_labels.length) {
         _options = [..._options, ...options.y_labels.slice(0, MAX_LINES)];
-        setYLabel(options.y_labels);
       }
 
     for (let i = _options.length; i < amountLines.current; i++) _options.push(`${i}`);
 
     setLineOptions(_options);
-  }, [data, setLineOptions, setSelectedData, setYLabel, setNumLines]);
+  }, [options, setLineOptions]);
 
   useEffect(() => {
     if (!boxRef.current) return;
@@ -87,18 +109,8 @@ export const GraphPlotter = memo((props) => {
     (event) => {
       const value = event.target.value;
       setSelectedLine(value);
-      if (value === "all") {
-        setSelectedData(data);
-        setNumLines(amountLines.current);
-        if ("y_labels" in options) setYLabel(options.y_labels);
-      } else {
-        const index = _lineOptions.findIndex((e) => e === value);
-        setSelectedData(data[index - 1]);
-        setNumLines(1);
-        if ("y_labels" in options) setYLabel([options.y_labels[index - 1]]);
-      }
     },
-    [amountLines, _lineOptions, setSelectedLine, setSelectedData, setYLabel, setNumLines]
+    [setSelectedLine]
   );
 
   return (
