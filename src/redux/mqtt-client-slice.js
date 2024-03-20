@@ -15,6 +15,7 @@ const MQTTClientSlice = createSlice({
     vacuum_data: [],
     n2_pressure_data: [],
     o2_level_data: [],
+    cleanup_pressure_data: [],
     logs: [],
     error_logs: [],
     system_info: {},
@@ -65,6 +66,9 @@ const MQTTClientSlice = createSlice({
     },
     updateO2LevelData: (state, action) => {
       state.o2_level_data = action.payload;
+    },
+    updateCleanupPressureData: (state, action) => {
+      state.cleanup_pressure_data = action.payload;
     },
     updateLog: (state, action) => {
       const logs = action.payload;
