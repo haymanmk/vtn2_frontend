@@ -25,7 +25,6 @@ const BUFFER_MAX_SIZE = 1000;
 const LOGS_MAX_LENGTH = 50;
 const LOGS_DAYS = 14;
 const PORT = 9001;
-let hostname = "localhost"; //"172.29.11.49";
 
 // MQTT settings
 const serviceName = "Frontend-Agent";
@@ -212,8 +211,8 @@ export const MQTTCenter = () => {
 
   useEffect(() => {
     if (!client.current) {
-      hostname = "172.29.11.49"; // window.location.hostname; //
-      // hostname = window.location.hostname; //
+      // const hostname = "172.29.11.49"; 
+      const hostname = window.location.hostname;
       options.clientId = `${serviceName}-${Math.random().toString(16).substring(2, 8)}`;
       const _url = `ws://${hostname}:${PORT}`;
       // watch WebSocket Connection timeout
