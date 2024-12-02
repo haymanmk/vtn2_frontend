@@ -24,13 +24,7 @@ const DEBUG_MESSAGE = false;
 const BUFFER_MAX_SIZE = 1000;
 const LOGS_MAX_LENGTH = 50;
 const LOGS_DAYS = 14;
-const UPDATE_BATCH = 5;
 const PORT = 9001;
-let hostname = "localhost"; //"172.29.11.49";
-
-let vacuumPressureDataSegmentLength = 0;
-let n2PressureDataSegmentLength = 0;
-let o2ContentDataSegmentLength = 0;
 
 // MQTT settings
 const serviceName = "Frontend-Agent";
@@ -100,6 +94,7 @@ const {
   updateVacuumData,
   updateN2PressureData,
   updateO2LevelData,
+  updateCleanupPressureData,
   updateLog,
   updateErrorLog,
   updateSystemInfo,
@@ -203,6 +198,7 @@ export const MQTTCenter = () => {
   let vacuumData = [];
   let n2PressureData = [];
   let o2ContentData = [];
+  let cleanupPressure = [];
   const dispatch = useDispatch();
   let client = useRef(); //MQTT client
   let webSocketConnectTimeout = useRef();
@@ -215,8 +211,8 @@ export const MQTTCenter = () => {
 
   useEffect(() => {
     if (!client.current) {
-      // hostname = "172.29.11.49"; // window.location.hostname; //
-      hostname = window.location.hostname; //
+      // const hostname = "172.29.11.49"; 
+      const hostname = window.location.hostname;
       options.clientId = `${serviceName}-${Math.random().toString(16).substring(2, 8)}`;
       const _url = `ws://${hostname}:${PORT}`;
       // watch WebSocket Connection timeout
@@ -321,17 +317,17 @@ export const MQTTCenter = () => {
 
         if (!msg) return;
         if (cmd === "vacuum_pressure") {
-          vacuumPressureDataSegmentLength += msg.length;
           vacuumData = appendData(msg, vacuumData, BUFFER_MAX_SIZE);
           dispatch(updateVacuumData(vacuumData));
         } else if (cmd === "n2_pressure") {
-          n2PressureDataSegmentLength += msg.length;
           n2PressureData = appendData(msg, n2PressureData, BUFFER_MAX_SIZE);
           dispatch(updateN2PressureData(n2PressureData));
         } else if (cmd === "o2_content") {
-          o2ContentDataSegmentLength += msg.length;
           o2ContentData = appendData(msg, o2ContentData, BUFFER_MAX_SIZE);
           dispatch(updateO2LevelData(o2ContentData));
+        } else if (cmd === "cleanup_pressure") {
+          cleanupPressure = appendData(msg, cleanupPressure, BUFFER_MAX_SIZE);
+          dispatch(updateCleanupPressureData(cleanupPressure));
         }
         break;
       case TOPIC_LOG_STATUS:
@@ -369,14 +365,13 @@ export const MQTTCenter = () => {
 
   const clearWaveformData = () => {
     vacuumData = [];
-    vacuumPressureDataSegmentLength = 0;
     dispatch(updateVacuumData(vacuumData));
     n2PressureData = [];
-    n2PressureDataSegmentLength = 0;
     dispatch(updateN2PressureData(n2PressureData));
     o2ContentData = [];
-    o2ContentDataSegmentLength = 0;
     dispatch(updateO2LevelData(o2ContentData));
+    cleanupPressure = [];
+    dispatch(updateCleanupPressureData(cleanupPressure));
   };
 
   return <></>;

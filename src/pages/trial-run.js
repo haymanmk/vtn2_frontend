@@ -138,16 +138,22 @@ const Page = () => {
   const mqttState = useSelector((state) => state.MQTTClient.state);
   const operationMode = useSelector((state) => state.MQTTClient.operation_mode);
   const operationState = useSelector((state) => state.MQTTClient.operation_state);
+
+  /**
+   * Data for graph plotting
+   */
   const vacuumLineData = useSelector((state) => state.MQTTClient.vacuum_data);
   const n2PressureData = useSelector((state) => state.MQTTClient.n2_pressure_data);
   const o2ContentData = useSelector((state) => state.MQTTClient.o2_level_data);
+  const cleanupPressureData = useSelector((state) => state.MQTTClient.cleanup_pressure_data);
   const linesData = useMemo(() => {
-    let arr = [[[0, 0]], [[0, 0]], [[0, 0]]];
-    if (vacuumLineData.length) arr[0] = vacuumLineData;
-    if (n2PressureData.length) arr[1] = n2PressureData;
-    if (o2ContentData.length) arr[2] = o2ContentData;
+    let arr = [[[0, 0]], [[0, 0]], [[0, 0]], [[0, 0]]];
+    if (cleanupPressureData.length) arr[0] = cleanupPressureData;
+    if (vacuumLineData.length) arr[1] = vacuumLineData;
+    if (n2PressureData.length) arr[2] = n2PressureData;
+    if (o2ContentData.length) arr[3] = o2ContentData;
     return arr;
-  }, [vacuumLineData, n2PressureData, o2ContentData]);
+  }, [vacuumLineData, n2PressureData, o2ContentData, cleanupPressureData]);
 
   const startTrialRun = useCallback(
     (event) => {
@@ -339,7 +345,7 @@ const Page = () => {
                     options={{
                       y_label_pos: "side",
                       x_label: "sec",
-                      y_labels: ["Vacuum(mbar)", "N2(mbar)", "O2(%)"],
+                      y_labels: ["Cleanup(mbar)", "Vacuum(mbar)", "N2(mbar)", "O2(%)"],
                     }}
                   />
                 </ContentSelector>
